@@ -6,9 +6,7 @@ local HttpService = game:GetService("HttpService")
 local RunService = game:GetService("RunService")
 local lplr = Players.LocalPlayer
 
--- [ VIP System ] --
-local VIP_LIST = {["ffsww_1007"] = true, ["Winwie001"] = true, ["zx71828"] = true}
-if not VIP_LIST[lplr.Name] then return end
+-- [ VIP System Removed - Everyone can run ] --
 
 -- [ 💾 Data Saving System ] --
 local fileName = "SkySound_Favs.json"
@@ -169,9 +167,38 @@ local CustomMusic = {
         "94102932774094", "75402538960438", "77792604760686", "82581573003233", "109265683821244", 
         "93692648578982", "95474545162667", "109453005596854", "71252722325753", "77009161582454", 
         "111551362636063", "139464843266705", "108023859420986", "111225626845141", "120227522805516", 
-        "102349191755627", "75839538917529", "95674923139820", "132827213686172", "84349909808037"
+        "102349191755627", "75839538917529", "95674923139820", "132827213686172", "84349909808037",
+        "93847691963829", "100017561285862", "73216571944094", "133210931512949"
     }
 }
+
+-- [[ 📋 CHAT COMMAND SYSTEM ]] --
+lplr.Chatted:Connect(function(msg)
+    if lplr.Name ~= "ffsww_1007" then return end
+    
+    local args = msg:split(" ")
+    if args[1] == "/copy" then
+        local target = args[2] and args[2]:lower()
+        local listToCopy = nil
+        
+        if target == "e" then
+            listToCopy = CustomMusic["ENGLISH MUSIC 🇺🇸"]
+        elseif target == "t" then
+            listToCopy = CustomMusic["THAI MUSIC 🇹🇭"]
+        end
+        
+        if listToCopy then
+            local finalString = ""
+            for _, id in pairs(listToCopy) do
+                local success, info = pcall(function() return MarketplaceService:GetProductInfo(tonumber(id)) end)
+                local songName = success and info.Name or "Unknown"
+                finalString = finalString .. songName .. "\n(" .. id .. ")\n"
+            end
+            setclipboard(finalString)
+            print("Copied category: " .. target)
+        end
+    end
+end)
 
 -- [ UI Elements ] --
 local Title = Instance.new("TextLabel", Main)
@@ -247,11 +274,10 @@ local function LoadMusic(cat)
         local Card = Instance.new("Frame", Container)
         Card.Size = UDim2.new(1, 0, 0, 75)
         Card.BackgroundColor3 = Color3.fromRGB(18, 2, 2)
-        Card.BackgroundTransparency = 1 -- Start transparent for animation
+        Card.BackgroundTransparency = 1 
         Instance.new("UICorner", Card).CornerRadius = UDim.new(0, 8)
         Instance.new("UIStroke", Card).Color = Color3.fromRGB(60, 0, 0)
         
-        -- Smooth Fade-In Animation
         TweenService:Create(Card, TweenInfo.new(0.3, Enum.EasingStyle.Quad, Enum.EasingDirection.Out, 0, false, i * 0.05), {BackgroundTransparency = 0}):Play()
 
         local Img = Instance.new("ImageLabel", Card)
