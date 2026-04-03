@@ -6,8 +6,6 @@ local HttpService = game:GetService("HttpService")
 local RunService = game:GetService("RunService")
 local lplr = Players.LocalPlayer
 
--- [ VIP System Removed - Everyone can run ] --
-
 -- [ 💾 Data Saving System ] --
 local fileName = "SkySound_Favs.json"
 local timeFileName = "SkySound_Runtime.json"
@@ -168,7 +166,8 @@ local CustomMusic = {
         "93692648578982", "95474545162667", "109453005596854", "71252722325753", "77009161582454", 
         "111551362636063", "139464843266705", "108023859420986", "111225626845141", "120227522805516", 
         "102349191755627", "75839538917529", "95674923139820", "132827213686172", "84349909808037",
-        "93847691963829", "100017561285862", "73216571944094", "133210931512949"
+        "93847691963829", "100017561285862", "73216571944094", "133210931512949",
+        "109337680029292", "114290483414538", "78346339335501", "117377891709305", "100760581794255", "97439414907139"
     }
 }
 
@@ -399,6 +398,40 @@ local function LoadMenu()
     end)
 end
 
+-- [ 🔔 Notification System ] --
+local function ShowNewSongs()
+    local Notify = Instance.new("Frame", ScreenGui)
+    Notify.Size = UDim2.new(0, 220, 0, 100)
+    Notify.Position = UDim2.new(0.5, -110, 0.4, 0)
+    Notify.BackgroundColor3 = Color3.fromRGB(15, 0, 0)
+    Notify.ClipsDescendants = true
+    Instance.new("UICorner", Notify)
+    Instance.new("UIStroke", Notify).Color = Color3.fromRGB(255, 0, 0)
+    
+    local NTitle = Instance.new("TextLabel", Notify)
+    NTitle.Size = UDim2.new(1, 0, 0, 30)
+    NTitle.Text = "NEW SONGS ADDED!"
+    NTitle.TextColor3 = Color3.new(1, 1, 0)
+    NTitle.Font = Enum.Font.Arcade
+    NTitle.TextSize = 14
+    NTitle.BackgroundTransparency = 1
+
+    local NContent = Instance.new("TextLabel", Notify)
+    NContent.Size = UDim2.new(1, 0, 0, 50)
+    NContent.Position = UDim2.new(0, 0, 0, 35)
+    NContent.Text = "Thai Music: +0\nEnglish Music: +10"
+    NContent.TextColor3 = Color3.new(1, 1, 1)
+    NContent.Font = Enum.Font.Arcade
+    NContent.TextSize = 12
+    NContent.BackgroundTransparency = 1
+
+    Notify.Size = UDim2.new(0, 0, 0, 100)
+    TweenService:Create(Notify, TweenInfo.new(0.5, Enum.EasingStyle.Back), {Size = UDim2.new(0, 220, 0, 100)}):Play()
+    task.wait(2.5)
+    TweenService:Create(Notify, TweenInfo.new(0.5, Enum.EasingStyle.Quart, Enum.EasingDirection.In), {Size = UDim2.new(0, 0, 0, 100), Position = UDim2.new(0.5, 0, 0.4, 0)}):Play()
+    game:GetService("Debris"):AddItem(Notify, 0.6)
+end
+
 AddBtn.MouseButton1Click:Connect(function()
     ClickAnim(AddBtn)
     local id = InputID.Text:gsub("%D", "")
@@ -414,8 +447,6 @@ BackBtn.MouseButton1Click:Connect(function()
     ClickAnim(BackBtn)
     LoadMenu()
 end)
-
-LoadMenu()
 
 -- [ ➖ Minimize Button Logic ] --
 local Minimize = Instance.new("TextButton", Main)
@@ -446,6 +477,11 @@ MiniIcon.MouseButton1Click:Connect(function()
     AnimateUI(Main, UDim2.new(0, 280, 0, 360), UDim2.new(0.5, -140, 0.5, -180))
 end)
 
--- Initial Open Animation
+-- Initial Sequence
+Main.Visible = false
+ShowNewSongs()
+task.wait(3)
+Main.Visible = true
 Main.Size = UDim2.new(0,0,0,0)
 AnimateUI(Main, UDim2.new(0, 280, 0, 360), UDim2.new(0.5, -140, 0.5, -180))
+LoadMenu()
