@@ -1,0 +1,123 @@
+-- [[ CONFIGURATION ]]
+getgenv().replacement = "VOID_DATA_ENCRYPTED" -- ข้อความที่จะให้ Logger เห็น
+_G.p = true -- ระบบ Bypass ทำงานอัตโนมัติ
+
+-- [[ FUNCTION: Convert String to ASCII ]]
+local function toASCII(str)
+    local result = ""
+    for i = 1, #str do
+        local char = string.sub(str, i, i)
+        result = result .. "%" .. string.byte(char)
+    end
+    return result
+end
+
+-- [[ UI DESIGN: HORROR RED STYLE ]]
+local ScreenGui = Instance.new("ScreenGui")
+local MainFrame = Instance.new("Frame")
+local Title = Instance.new("TextLabel")
+local IdInput = Instance.new("TextBox")
+local SendBtn = Instance.new("TextButton")
+local Status = Instance.new("TextLabel")
+
+ScreenGui.Name = "VOID_LITE"
+ScreenGui.Parent = game:GetService("CoreGui")
+ScreenGui.ResetOnSpawn = false
+
+MainFrame.Name = "MainFrame"
+MainFrame.Parent = ScreenGui
+MainFrame.BackgroundColor3 = Color3.fromRGB(12, 0, 0)
+MainFrame.BorderSizePixel = 2
+MainFrame.BorderColor3 = Color3.fromRGB(255, 0, 0)
+MainFrame.Position = UDim2.new(0.5, -90, 0.45, -60)
+MainFrame.Size = UDim2.new(0, 180, 0, 130)
+MainFrame.Active = true
+MainFrame.Draggable = true
+
+Title.Parent = MainFrame
+Title.Size = UDim2.new(1, 0, 0, 30)
+Title.Text = "VOID SYSTEM"
+Title.TextColor3 = Color3.fromRGB(255, 0, 0)
+Title.TextSize = 18
+Title.Font = Enum.Font.SpecialElite
+Title.BackgroundTransparency = 1
+
+-- ช่องใส่ ID เพลง
+IdInput.Name = "IdInput"
+IdInput.Parent = MainFrame
+IdInput.Position = UDim2.new(0.1, 0, 0.3, 0)
+IdInput.Size = UDim2.new(0.8, 0, 0, 30)
+IdInput.BackgroundColor3 = Color3.fromRGB(25, 0, 0)
+IdInput.BorderSizePixel = 1
+IdInput.BorderColor3 = Color3.fromRGB(180, 0, 0)
+IdInput.PlaceholderText = "SONG ID..."
+IdInput.PlaceholderColor3 = Color3.fromRGB(100, 0, 0)
+IdInput.Text = ""
+IdInput.TextColor3 = Color3.fromRGB(255, 255, 255)
+IdInput.Font = Enum.Font.SpecialElite
+IdInput.TextSize = 14
+
+-- ปุ่มส่งเพลง (ส่งปุ๊บ แปลงปั๊บ)
+SendBtn.Name = "SendBtn"
+SendBtn.Parent = MainFrame
+SendBtn.Position = UDim2.new(0.1, 0, 0.6, 0)
+SendBtn.Size = UDim2.new(0.8, 0, 0, 30)
+SendBtn.BackgroundColor3 = Color3.fromRGB(80, 0, 0)
+SendBtn.Text = "PLAY MUSIC"
+SendBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+SendBtn.Font = Enum.Font.SpecialElite
+SendBtn.BorderSizePixel = 0
+
+Status.Parent = MainFrame
+Status.Position = UDim2.new(0, 0, 0.85, 0)
+Status.Size = UDim2.new(1, 0, 0, 20)
+Status.Text = "SYSTEM ACTIVE"
+Status.TextColor3 = Color3.fromRGB(150, 0, 0)
+Status.TextSize = 10
+Status.Font = Enum.Font.SpecialElite
+Status.BackgroundTransparency = 1
+
+-- [[ HOOKMETAMETHOD: AUTOMATIC BYPASS ]]
+local namecall
+namecall = hookmetamethod(game, "__namecall", function(self, ...)
+    local args = {...}
+    local method = getnamecallmethod():lower()
+    
+    -- ดักจับการส่ง Remote เพลงทุกลูกที่ผ่านเครื่องเรา
+    if not checkcaller() and method == "fireserver" then
+        if tostring(self) == "PlayerToolEvent" or args[1] == "ToolMusicText" then
+            local originalId = tostring(args[2])
+            local encodedId = toASCII(originalId)
+            
+            -- แอบส่ง ID จริงที่แปลงเป็น ASCII แล้วไปที่เซิร์ฟเวอร์
+            task.spawn(function()
+                namecall(self, "ToolMusicText", encodedId, true)
+            end)
+            
+            -- หลอก Logger ให้เห็นเป็นค่าปลอมที่เราตั้งไว้
+            args[2] = getgenv().replacement or "nil"
+            return namecall(self, unpack(args))
+        end
+    end
+    return namecall(self, ...)
+end)
+
+-- [[ EVENT: PLAY BUTTON ]]
+SendBtn.MouseButton1Click:Connect(function()
+    local inputId = IdInput.Text
+    if inputId ~= "" then
+        -- ค้นหา Remote ของเกม (PlayerToolEvent)
+        local remote = game:GetService("ReplicatedStorage"):FindFirstChild("PlayerToolEvent")
+        if remote then
+            -- สั่ง FireServer ปกติ แต่จะโดน Hook ด้านบนแปลงเป็น ASCII ให้อัตโนมัติ
+            remote:FireServer("ToolMusicText", inputId) 
+            Status.Text = "ENCRYPTED & SENT"
+            task.wait(1.5)
+            Status.Text = "SYSTEM ACTIVE"
+        else
+            Status.Text = "REMOTE ERROR"
+        end
+    end
+end)
+
+print("VOID SYSTEM V3: Auto-Bypass Mode Loaded.")
