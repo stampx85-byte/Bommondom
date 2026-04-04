@@ -1,6 +1,16 @@
 -- [[ CONFIGURATION ]]
-getgenv().replacement = "123456789" -- ค่าที่คนอื่นจะเห็นใน Logger
-_G.p = true 
+local REMOTE_NAME = "PlayerToolEvent" -- ชื่อ Remote ของเกม
+
+-- [[ FUNCTION: TO ASCII (%NUMBER) ]]
+local function encodeToASCII(str)
+    local result = ""
+    for i = 1, #str do
+        local char = string.sub(str, i, i)
+        -- แปลงเป็น % ตามด้วยเลข ASCII Code
+        result = result .. "%" .. string.byte(char)
+    end
+    return result
+end
 
 -- [[ UI DESIGN: HORROR RED STYLE ]]
 local ScreenGui = Instance.new("ScreenGui")
@@ -10,7 +20,7 @@ local IdInput = Instance.new("TextBox")
 local SendBtn = Instance.new("TextButton")
 local Status = Instance.new("TextLabel")
 
-ScreenGui.Name = "VOID_V4"
+ScreenGui.Name = "VOID_ENCODER"
 ScreenGui.Parent = game:GetService("CoreGui")
 
 MainFrame.Name = "MainFrame"
@@ -25,7 +35,7 @@ MainFrame.Draggable = true
 
 Title.Parent = MainFrame
 Title.Size = UDim2.new(1, 0, 0, 30)
-Title.Text = "VOID V4"
+Title.Text = "VOID ENCODER"
 Title.TextColor3 = Color3.fromRGB(255, 0, 0)
 Title.TextSize = 18
 Title.Font = Enum.Font.SpecialElite
@@ -47,54 +57,38 @@ SendBtn.Parent = MainFrame
 SendBtn.Position = UDim2.new(0.1, 0, 0.6, 0)
 SendBtn.Size = UDim2.new(0.8, 0, 0, 30)
 SendBtn.BackgroundColor3 = Color3.fromRGB(80, 0, 0)
-SendBtn.Text = "PLAY NOW"
+SendBtn.Text = "SEND ASCII"
 SendBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
 SendBtn.Font = Enum.Font.SpecialElite
 
 Status.Parent = MainFrame
 Status.Position = UDim2.new(0, 0, 0.85, 0)
 Status.Size = UDim2.new(1, 0, 0, 20)
-Status.Text = "READY"
+Status.Text = "READY TO ENCODE"
 Status.TextColor3 = Color3.fromRGB(150, 0, 0)
 Status.Font = Enum.Font.SpecialElite
 Status.BackgroundTransparency = 1
 
--- [[ HOOKMETAMETHOD: THE FIX ]]
-local namecall
-namecall = hookmetamethod(game, "__namecall", function(self, ...)
-    local args = {...}
-    local method = getnamecallmethod():lower()
-    
-    if not checkcaller() and method == "fireserver" then
-        if tostring(self) == "PlayerToolEvent" or args[1] == "ToolMusicText" then
-            local realId = args[2] -- เก็บ ID จริงไว้
-            
-            -- 1. บังคับส่ง ID จริงไปที่ Server แบบเงียบๆ (ไม่ผ่าน Hook ตัวนี้ซ้ำ)
-            task.spawn(function()
-                -- ใช้ 'namecall' เดิมส่งค่าจริง เพื่อให้เพลงเล่น
-                namecall(self, "ToolMusicText", realId, true)
-            end)
-            
-            -- 2. แก้ไข 'args' ที่กำลังจะส่งออกไปตามปกติ ให้เป็นค่าปลอม
-            -- วิธีนี้ Logger จะจับได้แค่ตัวแปรที่ถูกแก้แล้ว (ค่าปลอม)
-            args[2] = getgenv().replacement or "nil"
-            return namecall(self, unpack(args))
-        end
-    end
-    return namecall(self, ...)
-end)
-
--- [[ EVENT: PLAY ]]
+-- [[ EVENT: PLAY & ENCODE ]]
 SendBtn.MouseButton1Click:Connect(function()
-    local inputId = IdInput.Text
-    if inputId ~= "" then
-        local remote = game:GetService("ReplicatedStorage"):FindFirstChild("PlayerToolEvent")
+    local rawId = IdInput.Text
+    if rawId ~= "" then
+        -- 1. แปลง ID เป็น ASCII อัตโนมัติ
+        local encodedId = encodeToASCII(rawId)
+        
+        -- 2. ค้นหา Remote และส่งค่าที่แปลงแล้วออกไป
+        local remote = game:GetService("ReplicatedStorage"):FindFirstChild(REMOTE_NAME)
         if remote then
-            -- ส่งไปหา Hook ด้านบน
-            remote:FireServer("ToolMusicText", inputId) 
-            Status.Text = "SENT (HIDDEN)"
-            task.wait(1)
-            Status.Text = "READY"
+            -- ส่งข้อมูลไปยัง Remote (กั้น ID ด้วยการใช้ ASCII)
+            remote:FireServer("ToolMusicText", encodedId) 
+            
+            Status.Text = "SENT: " .. encodedId
+            print("ffsww_1007 | Encoded ID Sent: " .. encodedId)
+            
+            task.wait(2)
+            Status.Text = "READY TO ENCODE"
+        else
+            Status.Text = "REMOTE NOT FOUND"
         end
     end
 end)
