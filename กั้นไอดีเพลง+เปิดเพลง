@@ -1,94 +1,112 @@
--- [[ CONFIGURATION ]]
-local REMOTE_NAME = "PlayerToolEvent" -- ชื่อ Remote ของเกม
-
--- [[ FUNCTION: TO ASCII (%NUMBER) ]]
-local function encodeToASCII(str)
-    local result = ""
-    for i = 1, #str do
-        local char = string.sub(str, i, i)
-        -- แปลงเป็น % ตามด้วยเลข ASCII Code
-        result = result .. "%" .. string.byte(char)
-    end
-    return result
-end
-
--- [[ UI DESIGN: HORROR RED STYLE ]]
+-- [[ UI Configuration ]] --
 local ScreenGui = Instance.new("ScreenGui")
 local MainFrame = Instance.new("Frame")
 local Title = Instance.new("TextLabel")
-local IdInput = Instance.new("TextBox")
-local SendBtn = Instance.new("TextButton")
-local Status = Instance.new("TextLabel")
+local MusicIDInput = Instance.new("TextBox")
+local PlayButton = Instance.new("TextButton")
+local StatusLabel = Instance.new("TextLabel")
 
-ScreenGui.Name = "VOID_ENCODER"
+ScreenGui.Name = "DeltaMusicHook"
 ScreenGui.Parent = game:GetService("CoreGui")
 
 MainFrame.Name = "MainFrame"
 MainFrame.Parent = ScreenGui
-MainFrame.BackgroundColor3 = Color3.fromRGB(15, 0, 0)
-MainFrame.BorderSizePixel = 2
-MainFrame.BorderColor3 = Color3.fromRGB(255, 0, 0)
-MainFrame.Position = UDim2.new(0.5, -90, 0.45, -60)
-MainFrame.Size = UDim2.new(0, 180, 0, 130)
+MainFrame.BackgroundColor3 = Color3.fromRGB(25, 25, 30)
+MainFrame.Position = UDim2.new(0.5, -110, 0.5, -80)
+MainFrame.Size = UDim2.new(0, 220, 0, 160)
 MainFrame.Active = true
 MainFrame.Draggable = true
 
+local UICorner = Instance.new("UICorner")
+UICorner.Parent = MainFrame
+
 Title.Parent = MainFrame
-Title.Size = UDim2.new(1, 0, 0, 30)
-Title.Text = "VOID ENCODER"
-Title.TextColor3 = Color3.fromRGB(255, 0, 0)
-Title.TextSize = 18
-Title.Font = Enum.Font.SpecialElite
+Title.Size = UDim2.new(1, 0, 0, 35)
+Title.Text = "AUTO ENCODER"
+Title.TextColor3 = Color3.fromRGB(255, 255, 255)
 Title.BackgroundTransparency = 1
+Title.Font = Enum.Font.GothamBold
 
-IdInput.Name = "IdInput"
-IdInput.Parent = MainFrame
-IdInput.Position = UDim2.new(0.1, 0, 0.3, 0)
-IdInput.Size = UDim2.new(0.8, 0, 0, 30)
-IdInput.BackgroundColor3 = Color3.fromRGB(25, 0, 0)
-IdInput.BorderColor3 = Color3.fromRGB(180, 0, 0)
-IdInput.PlaceholderText = "SONG ID..."
-IdInput.Text = ""
-IdInput.TextColor3 = Color3.fromRGB(255, 255, 255)
-IdInput.Font = Enum.Font.SpecialElite
+MusicIDInput.Parent = MainFrame
+MusicIDInput.Position = UDim2.new(0.1, 0, 0.3, 0)
+MusicIDInput.Size = UDim2.new(0.8, 0, 0, 35)
+MusicIDInput.PlaceholderText = "ใส่ ID เพลงที่นี่"
+MusicIDInput.Text = ""
+MusicIDInput.BackgroundColor3 = Color3.fromRGB(40, 40, 45)
+MusicIDInput.TextColor3 = Color3.fromRGB(255, 255, 255)
 
-SendBtn.Name = "SendBtn"
-SendBtn.Parent = MainFrame
-SendBtn.Position = UDim2.new(0.1, 0, 0.6, 0)
-SendBtn.Size = UDim2.new(0.8, 0, 0, 30)
-SendBtn.BackgroundColor3 = Color3.fromRGB(80, 0, 0)
-SendBtn.Text = "SEND ASCII"
-SendBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
-SendBtn.Font = Enum.Font.SpecialElite
+PlayButton.Parent = MainFrame
+PlayButton.Position = UDim2.new(0.1, 0, 0.6, 0)
+PlayButton.Size = UDim2.new(0.8, 0, 0, 35)
+PlayButton.Text = "เริ่มการทำงาน"
+PlayButton.BackgroundColor3 = Color3.fromRGB(0, 150, 255)
+PlayButton.TextColor3 = Color3.fromRGB(255, 255, 255)
 
-Status.Parent = MainFrame
-Status.Position = UDim2.new(0, 0, 0.85, 0)
-Status.Size = UDim2.new(1, 0, 0, 20)
-Status.Text = "READY TO ENCODE"
-Status.TextColor3 = Color3.fromRGB(150, 0, 0)
-Status.Font = Enum.Font.SpecialElite
-Status.BackgroundTransparency = 1
+--- [[ Logic Section ]] ---
 
--- [[ EVENT: PLAY & ENCODE ]]
-SendBtn.MouseButton1Click:Connect(function()
-    local rawId = IdInput.Text
-    if rawId ~= "" then
-        -- 1. แปลง ID เป็น ASCII อัตโนมัติ
-        local encodedId = encodeToASCII(rawId)
-        
-        -- 2. ค้นหา Remote และส่งค่าที่แปลงแล้วออกไป
-        local remote = game:GetService("ReplicatedStorage"):FindFirstChild(REMOTE_NAME)
-        if remote then
-            -- ส่งข้อมูลไปยัง Remote (กั้น ID ด้วยการใช้ ASCII)
-            remote:FireServer("ToolMusicText", encodedId) 
-            
-            Status.Text = "SENT: " .. encodedId
-            print("ffsww_1007 | Encoded ID Sent: " .. encodedId)
-            
-            task.wait(2)
-            Status.Text = "READY TO ENCODE"
-        else
-            Status.Text = "REMOTE NOT FOUND"
+local PAD_LENGTH = 1000
+local targetMusicID = ""
+local isEncodingActive = false
+
+local function decStrToHex(s)
+    local chars = "0123456789ABCDEF"
+    local hexResult = ""
+    while s ~= "0" and s ~= "" do
+        local remainder = 0
+        local newS = ""
+        for i = 1, #s do
+            local d = tonumber(string.sub(s, i, i))
+            remainder = remainder * 10 + d
+            if newS ~= "" or remainder >= 16 then
+                newS = newS .. tostring(math.floor(remainder / 16))
+                remainder = remainder % 16
+            end
         end
+        hexResult = string.sub(chars, remainder + 1, remainder + 1) .. hexResult
+        s = newS ~= "" and newS or "0"
+    end
+    return hexResult ~= "" and hexResult or "0"
+end
+
+local function encodeID(numStr)
+    local cleaned = tostring(numStr):match("%d+")
+    if not cleaned then return nil end
+    local hex = decStrToHex(cleaned)
+    local padded = string.rep("0", PAD_LENGTH - #hex) .. hex
+    return "0x" .. padded
+end
+
+-- [[ Hook Section: ดักจับการส่งข้อมูล ]] --
+local oldNamecall
+oldNamecall = hookmetamethod(game, "__namecall", function(self, ...)
+    local args = {...}
+    local method = getnamecallmethod()
+
+    -- ตรวจสอบเงื่อนไขตามที่คุณระบุ
+    if method == "FireServer" or method == "fireserver" then
+        if tostring(self) == "PlayerToolEvent" or args[1] == "ToolMusicText" then
+            if isEncodingActive and targetMusicID ~= "" then
+                -- แก้ไข Argument ตัวที่ต้องการส่งเป็น ID ที่เข้ารหัสแล้ว
+                args[2] = encodeID(targetMusicID) 
+                return oldNamecall(self, unpack(args))
+            end
+        end
+    end
+    
+    return oldNamecall(self, ...)
+end)
+
+-- [[ Button Events ]] --
+PlayButton.MouseButton1Click:Connect(function()
+    if MusicIDInput.Text ~= "" then
+        targetMusicID = MusicIDInput.Text
+        isEncodingActive = true
+        PlayButton.Text = "กำลังทำงาน (ON)"
+        PlayButton.BackgroundColor3 = Color3.fromRGB(46, 204, 113)
+        print("Hook Active for ID: " .. targetMusicID)
+    else
+        PlayButton.Text = "กรุณาใส่ ID!"
+        task.wait(1)
+        PlayButton.Text = "เริ่มการทำงาน"
     end
 end)
