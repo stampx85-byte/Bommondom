@@ -1,128 +1,247 @@
--- [[ การตั้งค่า UI ใหม่ทั้งหมด ]] --
+-- [[ SkySound: Audio Sniffer & Player V12 - Minecraft Edition ]] --
+local TweenService = game:GetService("TweenService")
+local CoreGui = game:GetService("CoreGui")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local UserInputService = game:GetService("UserInputService")
+local HttpService = game:GetService("HttpService")
+local Players = game:GetService("Players")
+local MarketService = game:GetService("MarketplaceService")
+
+-- Prevent Duplicates
+if CoreGui:FindFirstChild("SkySound") then
+    CoreGui.SkySound:Destroy()
+end
+
 local ScreenGui = Instance.new("ScreenGui")
-local MainFrame = Instance.new("Frame")
-local Title = Instance.new("TextLabel")
-local MusicIDInput = Instance.new("TextBox")
-local PlayButton = Instance.new("TextButton")
-local StatusLabel = Instance.new("TextLabel")
-local UICorner = Instance.new("UICorner")
+ScreenGui.Name = "SkySound"
+ScreenGui.Parent = CoreGui
+ScreenGui.IgnoreGuiInset = true
 
-ScreenGui.Name = "CustomMusicRemoteUI"
-ScreenGui.Parent = game:GetService("CoreGui")
-ScreenGui.ResetOnSpawn = false
+-- [ Function: Minecraft Style UI - Force All ]
+local function SetMinecraftFont(obj, size)
+    obj.Font = Enum.Font.Code 
+    obj.TextSize = size or 14
+end
 
--- ตัวเครื่องหลัก
-MainFrame.Name = "MainFrame"
-MainFrame.Parent = ScreenGui
-MainFrame.BackgroundColor3 = Color3.fromRGB(35, 35, 40)
-MainFrame.Position = UDim2.new(0.5, -120, 0.5, -90)
-MainFrame.Size = UDim2.new(0, 240, 0, 180)
-MainFrame.Active = true
-MainFrame.Draggable = true
+-- [ 🔥 Function: MakeDraggable ]
+local function MakeDraggable(gui)
+    local dragging, dragInput, dragStart, startPos
+    gui.InputBegan:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+            dragging = true; dragStart = input.Position; startPos = gui.Position
+            input.Changed:Connect(function() if input.UserInputState == Enum.UserInputState.End then dragging = false end end)
+        end
+    end)
+    UserInputService.InputChanged:Connect(function(input)
+        if dragging and (input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch) then
+            local delta = input.Position - dragStart
+            TweenService:Create(gui, TweenInfo.new(0.12, Enum.EasingStyle.Quart, Enum.EasingDirection.Out), {
+                Position = UDim2.new(startPos.X.Scale, startPos.X.Offset + delta.X, startPos.Y.Scale, startPos.Y.Offset + delta.Y)
+            }):Play()
+        end
+    end)
+end
 
-local MainCorner = Instance.new("UICorner")
-MainCorner.CornerRadius = UDim.new(0, 12)
-MainCorner.Parent = MainFrame
+-- [ Main Body - 600x350 ]
+local Main = Instance.new("Frame", ScreenGui)
+Main.Size = UDim2.new(0, 600, 0, 350)
+Main.Position = UDim2.new(0.5, -300, 0.5, -175)
+Main.BackgroundColor3 = Color3.fromRGB(10, 10, 14)
+Main.BorderSizePixel = 0
+Main.ClipsDescendants = true
+Instance.new("UICorner", Main).CornerRadius = UDim.new(0, 10)
 
--- หัวข้อ
-Title.Parent = MainFrame
-Title.BackgroundTransparency = 1
-Title.Size = UDim2.new(1, 0, 0, 45)
-Title.Font = Enum.Font.GothamBold
-Title.Text = "MUSIC PLAYER"
-Title.TextColor3 = Color3.fromRGB(255, 255, 255)
-Title.TextSize = 18
+local MainStroke = Instance.new("UIStroke", Main)
+MainStroke.Color = Color3.fromRGB(255, 30, 30)
+MainStroke.Thickness = 2
 
--- ช่องกรอก ID เพลง
-MusicIDInput.Parent = MainFrame
-MusicIDInput.BackgroundColor3 = Color3.fromRGB(50, 50, 55)
-MusicIDInput.Position = UDim2.new(0.1, 0, 0.3, 0)
-MusicIDInput.Size = UDim2.new(0.8, 0, 0, 35)
-MusicIDInput.Font = Enum.Font.Gotham
-MusicIDInput.PlaceholderText = "วาง ID เพลงที่นี่..."
-MusicIDInput.Text = ""
-MusicIDInput.TextColor3 = Color3.fromRGB(255, 255, 255)
-MusicIDInput.TextSize = 14
+-- [[ TOP BAR ]] --
+local Header = Instance.new("Frame", Main)
+Header.Size = UDim2.new(1, 0, 0, 35)
+Header.BackgroundTransparency = 1
 
-local InputCorner = Instance.new("UICorner")
-InputCorner.Parent = MusicIDInput
+local ScriptTitle = Instance.new("TextLabel", Header)
+ScriptTitle.Size = UDim2.new(0.5, 0, 1, 0)
+ScriptTitle.Position = UDim2.new(0, 12, 0, 0)
+ScriptTitle.Text = "SkySound | MC Edition"
+ScriptTitle.TextColor3 = Color3.fromRGB(255, 30, 30)
+SetMinecraftFont(ScriptTitle, 15); ScriptTitle.BackgroundTransparency = 1; ScriptTitle.TextXAlignment = Enum.TextXAlignment.Left
 
--- ปุ่มส่งข้อมูล (FireServer)
-PlayButton.Parent = MainFrame
-PlayButton.BackgroundColor3 = Color3.fromRGB(0, 120, 255)
-PlayButton.Position = UDim2.new(0.1, 0, 0.6, 0)
-PlayButton.Size = UDim2.new(0.8, 0, 0, 40)
-PlayButton.Font = Enum.Font.GothamBold
-PlayButton.Text = "เปิดเพลง (SEND)"
-PlayButton.TextColor3 = Color3.fromRGB(255, 255, 255)
-PlayButton.TextSize = 14
+local MinBtn = Instance.new("TextButton", Header)
+MinBtn.Size = UDim2.new(0, 28, 0, 28)
+MinBtn.Position = UDim2.new(1, -35, 0, 4)
+MinBtn.BackgroundColor3 = Color3.fromRGB(30, 30, 35)
+MinBtn.Text = "-"
+MinBtn.TextColor3 = Color3.new(1,1,1)
+SetMinecraftFont(MinBtn, 18); Instance.new("UICorner", MinBtn)
 
-local ButtonCorner = Instance.new("UICorner")
-ButtonCorner.Parent = PlayButton
+-- [[ STATUS PANEL ]] --
+local StatusPanel = Instance.new("Frame", Main)
+StatusPanel.Size = UDim2.new(1, -20, 0, 50)
+StatusPanel.Position = UDim2.new(0, 10, 0, 40)
+StatusPanel.BackgroundColor3 = Color3.fromRGB(18, 18, 22)
+Instance.new("UICorner", StatusPanel)
+Instance.new("UIStroke", StatusPanel).Color = Color3.fromRGB(40, 40, 45)
 
--- [[ ระบบการเข้ารหัส (Encoding Logic) ]] --
+local UserImage = Instance.new("ImageLabel", StatusPanel)
+UserImage.Size = UDim2.new(0, 38, 0, 38)
+UserImage.Position = UDim2.new(0, 6, 0.5, -19)
+UserImage.Image = "rbxthumb://type=AvatarHeadShot&id="..Players.LocalPlayer.UserId.."&w=150&h=150"
+Instance.new("UICorner", UserImage).CornerRadius = UDim.new(1, 0)
 
-local PAD_LENGTH = 1000
+local UserText = Instance.new("TextLabel", StatusPanel)
+UserText.Size = UDim2.new(1, -60, 1, 0)
+UserText.Position = UDim2.new(0, 50, 0, 0)
+UserText.BackgroundTransparency = 1
+UserText.TextColor3 = Color3.new(1,1,1)
+UserText.TextXAlignment = Enum.TextXAlignment.Left
+UserText.RichText = true
+SetMinecraftFont(UserText, 13)
+UserText.Text = "SYSTEM: <font color='#ff2828'>MINECRAFT</font>\nSNIFFING..."
 
-local function decStrToHex(s)
-    local chars = "0123456789ABCDEF"
-    local hexResult = ""
-    while s ~= "0" and s ~= "" do
-        local remainder = 0
-        local newS = ""
-        for i = 1, #s do
-            local d = tonumber(string.sub(s, i, i))
-            remainder = remainder * 10 + d
-            if newS ~= "" or remainder >= 16 then
-                newS = newS .. tostring(math.floor(remainder / 16))
-                remainder = remainder % 16
+-- [ Left: Audio Sniffer ]
+local LeftPanel = Instance.new("Frame", Main)
+LeftPanel.Size = UDim2.new(0, 310, 1, -110); LeftPanel.Position = UDim2.new(0, 10, 0, 100)
+LeftPanel.BackgroundTransparency = 1
+
+local BrowserTitle = Instance.new("TextLabel", LeftPanel)
+BrowserTitle.Size = UDim2.new(1, 0, 0, 25)
+BrowserTitle.Text = "> AUDIO_LOG"
+BrowserTitle.TextColor3 = Color3.fromRGB(255, 30, 30)
+SetMinecraftFont(BrowserTitle, 14); BrowserTitle.BackgroundTransparency = 1; BrowserTitle.TextXAlignment = Enum.TextXAlignment.Left
+
+local ScrollAudios = Instance.new("ScrollingFrame", LeftPanel)
+ScrollAudios.Size = UDim2.new(1, 0, 1, -30); ScrollAudios.Position = UDim2.new(0, 0, 0, 30)
+ScrollAudios.BackgroundTransparency = 1; ScrollAudios.ScrollBarThickness = 2; ScrollAudios.ScrollBarImageColor3 = Color3.fromRGB(255, 30, 30)
+local Layout = Instance.new("UIListLayout", ScrollAudios); Layout.Padding = UDim.new(0, 5)
+
+-- [ Right: Control Panel - Improved Spacing ]
+local RightPanel = Instance.new("Frame", Main)
+RightPanel.Size = UDim2.new(0, 250, 1, -110); RightPanel.Position = UDim2.new(1, -260, 0, 100)
+RightPanel.BackgroundTransparency = 1
+
+local MusicIDInput = Instance.new("TextBox", RightPanel)
+MusicIDInput.Size = UDim2.new(1, 0, 0, 35); MusicIDInput.Position = UDim2.new(0, 0, 0, 0)
+MusicIDInput.BackgroundColor3 = Color3.fromRGB(18, 18, 22); MusicIDInput.TextColor3 = Color3.new(1,1,1)
+MusicIDInput.PlaceholderText = "ID HERE..."; MusicIDInput.Text = ""
+SetMinecraftFont(MusicIDInput, 13)
+Instance.new("UICorner", MusicIDInput); Instance.new("UIStroke", MusicIDInput).Color = Color3.fromRGB(40, 40, 45)
+
+local PlayButton = Instance.new("TextButton", RightPanel)
+PlayButton.Size = UDim2.new(1, 0, 0, 40); PlayButton.Position = UDim2.new(0, 0, 0.22, 0) -- Adjusted
+PlayButton.BackgroundColor3 = Color3.fromRGB(255, 30, 30); PlayButton.Text = "PLAY AUDIO"; PlayButton.TextColor3 = Color3.new(1,1,1)
+SetMinecraftFont(PlayButton, 14); Instance.new("UICorner", PlayButton)
+
+local ToggleTabBtn = Instance.new("TextButton", RightPanel)
+ToggleTabBtn.Size = UDim2.new(1, 0, 0, 40); ToggleTabBtn.Position = UDim2.new(0, 0, 0.40, 0) -- Adjusted
+ToggleTabBtn.BackgroundColor3 = Color3.fromRGB(30, 30, 35); ToggleTabBtn.Text = "TOGGLE LIST"; ToggleTabBtn.TextColor3 = Color3.new(1,1,1)
+SetMinecraftFont(ToggleTabBtn, 13); Instance.new("UICorner", ToggleTabBtn)
+
+local ScriptLoadBtn = Instance.new("TextButton", RightPanel)
+ScriptLoadBtn.Size = UDim2.new(1, 0, 0, 45); ScriptLoadBtn.Position = UDim2.new(0, 0, 0.62, 0) -- Adjusted
+ScriptLoadBtn.BackgroundColor3 = Color3.fromRGB(200, 20, 20); ScriptLoadBtn.Text = "Script Music SkySound"; ScriptLoadBtn.TextColor3 = Color3.new(1,1,1)
+SetMinecraftFont(ScriptLoadBtn, 13); Instance.new("UICorner", ScriptLoadBtn)
+Instance.new("UIStroke", ScriptLoadBtn).Color = Color3.new(1,1,1)
+
+ScriptLoadBtn.MouseButton1Click:Connect(function()
+    loadstring(game:HttpGet("https://raw.githubusercontent.com/stampx85-byte/Bommondom/refs/heads/main/SkySoundXD"))()
+end)
+
+-- [[ SNIFFER CORE ]] --
+local function GetAudioInfo(id)
+    local success, info = pcall(function() return MarketService:GetProductInfo(id) end)
+    return success and info or nil
+end
+
+local function CreateAudioCard(ownerName, id)
+    if ScrollAudios:FindFirstChild(id) then return end
+    local Card = Instance.new("Frame", ScrollAudios)
+    Card.Name = id; Card.Size = UDim2.new(1, -5, 0, 65); Card.BackgroundColor3 = Color3.fromRGB(18, 18, 22)
+    Instance.new("UICorner", Card); Instance.new("UIStroke", Card).Color = Color3.fromRGB(30, 30, 35)
+    
+    local AudioImg = Instance.new("ImageLabel", Card)
+    AudioImg.Size = UDim2.new(0, 45, 0, 45); AudioImg.Position = UDim2.new(0, 8, 0.5, -22.5)
+    AudioImg.Image = "https://www.roblox.com/asset-thumbnail/image?assetId="..id.."&width=420&height=420&format=png"
+    Instance.new("UICorner", AudioImg)
+
+    local Info = Instance.new("TextLabel", Card)
+    Info.Size = UDim2.new(1, -120, 1, 0); Info.Position = UDim2.new(0, 60, 0, 0)
+    Info.BackgroundTransparency = 1; Info.TextColor3 = Color3.new(1,1,1); Info.TextXAlignment = Enum.TextXAlignment.Left; Info.RichText = true
+    SetMinecraftFont(Info, 10)
+    local musicData = GetAudioInfo(id)
+    Info.Text = string.format("<font color='#ff2828'>%s</font>\nID: %s\nBY: %s", (musicData and musicData.Name or "Unknown"):sub(1,15), id, ownerName)
+    
+    local Copy = Instance.new("TextButton", Card)
+    Copy.Size = UDim2.new(0, 50, 0, 25); Copy.Position = UDim2.new(1, -55, 0.5, -12.5)
+    Copy.BackgroundColor3 = Color3.fromRGB(255, 30, 30); Copy.Text = "COPY"; Copy.TextColor3 = Color3.new(1,1,1)
+    SetMinecraftFont(Copy, 11); Instance.new("UICorner", Copy)
+    Copy.MouseButton1Click:Connect(function() setclipboard(tostring(id)); Copy.Text = "OK"; task.wait(0.5); Copy.Text = "COPY" end)
+    ScrollAudios.CanvasSize = UDim2.new(0, 0, 0, Layout.AbsoluteContentSize.Y + 5)
+end
+
+task.spawn(function()
+    while true do
+        for _, v in pairs(game:GetDescendants()) do
+            if v:IsA("Sound") then
+                if not v:GetAttribute("IsSkySound") then v.Volume = 0 end
+                if v.SoundId ~= "" and v.TimeLength > 5 then
+                    local cleanID = v.SoundId:match("%d+")
+                    if cleanID then 
+                        local owner = "Unknown"
+                        local p = v.Parent
+                        while p do
+                            if p:IsA("Model") and game.Players:GetPlayerFromCharacter(p) then owner = game.Players:GetPlayerFromCharacter(p).Name break
+                            elseif p:IsA("BackpackItem") and p.Parent and p.Parent:IsA("Backpack") then owner = p.Parent.Parent.Name break end
+                            p = p.Parent
+                        end
+                        CreateAudioCard(owner, cleanID) 
+                    end
+                end
             end
         end
+        task.wait(3)
+    end
+end)
+
+-- [[ UI COMMANDS ]] --
+local function decStrToHex(s)
+    local chars = "0123456789ABCDEF"; local hexResult = ""; local numStr = s
+    while numStr ~= "0" and numStr ~= "" do
+        local remainder = 0; local newS = ""
+        for i = 1, #numStr do
+            local d = tonumber(string.sub(numStr, i, i))
+            remainder = remainder * 10 + d
+            if newS ~= "" or remainder >= 16 then newS = newS .. tostring(math.floor(remainder / 16)) remainder = remainder % 16 end
+        end
         hexResult = string.sub(chars, remainder + 1, remainder + 1) .. hexResult
-        s = newS ~= "" and newS or "0"
+        numStr = (newS ~= "" and newS or "0")
     end
     return hexResult ~= "" and hexResult or "0"
 end
 
-local function encodeID(numStr)
-    local cleaned = tostring(numStr):match("%d+")
-    if not cleaned then return nil end
-    local hex = decStrToHex(cleaned)
-    local padded = string.rep("0", PAD_LENGTH - #hex) .. hex
-    return "0x" .. padded
-end
-
--- [[ ฟังก์ชันการทำงานเมื่อกดปุ่ม ]] --
-
 PlayButton.MouseButton1Click:Connect(function()
-    local rawID = MusicIDInput.Text
-    
-    if rawID ~= "" then
-        -- เข้ารหัส ID ตามฟังก์ชันของคุณ
-        local encodedID = encodeID(rawID)
-        
-        -- ค้นหา Remote ตามโครงสร้างใหม่ที่คุณให้มา
-        local re = game:GetService("ReplicatedStorage"):FindFirstChild("RE")
-        if re and re:FindFirstChild("PlayerToolEvent") then
-            -- ส่งข้อมูลไปยัง Server: FireServer("ToolMusicText", "ID ที่เข้ารหัส", true)
-            re.PlayerToolEvent:FireServer("ToolMusicText", encodedID, true)
-            
-            -- แสดงสถานะชั่วคราว
-            PlayButton.Text = "ส่งข้อมูลสำเร็จ!"
-            PlayButton.BackgroundColor3 = Color3.fromRGB(46, 204, 113)
-            task.wait(1.5)
-            PlayButton.Text = "เปิดเพลง (SEND)"
-            PlayButton.BackgroundColor3 = Color3.fromRGB(0, 120, 255)
-        else
-            PlayButton.Text = "ไม่พบ Remote (RE)!"
-            PlayButton.BackgroundColor3 = Color3.fromRGB(231, 76, 60)
-            task.wait(1.5)
-            PlayButton.Text = "เปิดเพลง (SEND)"
-            PlayButton.BackgroundColor3 = Color3.fromRGB(0, 120, 255)
-        end
-    else
-        PlayButton.Text = "กรุณาใส่ ID เพลง!"
-        task.wait(1)
-        PlayButton.Text = "เปิดเพลง (SEND)"
+    local hex = decStrToHex(MusicIDInput.Text)
+    local encoded = "0x" .. string.rep("0", 1000 - #hex) .. hex
+    local re = ReplicatedStorage:FindFirstChild("RE")
+    if re and re:FindFirstChild("PlayerToolEvent") then
+        re.PlayerToolEvent:FireServer("ToolMusicText", encoded, true)
+        UserText.Text = "PLAYING:\n<font color='#ff2828'>" .. MusicIDInput.Text .. "</font>"
     end
 end)
+
+ToggleTabBtn.MouseButton1Click:Connect(function()
+    LeftPanel.Visible = not LeftPanel.Visible
+    local newWidth = LeftPanel.Visible and 600 or 300
+    TweenService:Create(Main, TweenInfo.new(0.3, Enum.EasingStyle.Quart, Enum.EasingDirection.Out), {Size = UDim2.new(0, newWidth, 0, 350)}):Play()
+    if not LeftPanel.Visible then RightPanel.Position = UDim2.new(0, 25, 0, 100) else RightPanel.Position = UDim2.new(1, -260, 0, 100) end
+end)
+
+local isMinimized = false
+MinBtn.MouseButton1Click:Connect(function()
+    isMinimized = not isMinimized
+    local targetY = isMinimized and 35 or 350
+    TweenService:Create(Main, TweenInfo.new(0.4, Enum.EasingStyle.Back, Enum.EasingDirection.Out), {Size = UDim2.new(0, Main.Size.X.Offset, 0, targetY)}):Play()
+    MinBtn.Text = isMinimized and "+" or "-"
+end)
+
+MakeDraggable(Main)
