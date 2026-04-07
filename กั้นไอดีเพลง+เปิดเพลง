@@ -183,7 +183,7 @@ task.spawn(function()
     while true do
         for _, v in pairs(game:GetDescendants()) do
             if v:IsA("Sound") then
-                if not v:GetAttribute("IsSkySound") then v.Volume = 0 end
+                -- บรรทัดที่เคยสั่ง v.Volume = 0 ถูกนำออกแล้ว เพื่อไม่ให้ปิดเสียงเพลงคนอื่น
                 if v.SoundId ~= "" and v.TimeLength > 5 then
                     local cleanID = v.SoundId:match("%d+")
                     if cleanID then 
