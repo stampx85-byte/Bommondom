@@ -1,0 +1,213 @@
+--[[
+    ================================================================
+    SKY SOUND ADMIN V2 - "THE BREACH" (AI-READY STRUCTURE)
+    ================================================================
+    [GUIDE FOR AI GENERATION]:
+    1. UI_THEME: Dark Horror (Background: 10,10,10 | Accent: 255,0,0)
+    2. CORE_FRAME: MainFrame (Draggable, Minimizable)
+    3. COMPONENT_FACTORY: AddItem(name, type, model, details, path)
+    4. FUNCTIONALITY: Remote Scanning & Object Inspection (Raycast Select)
+    ================================================================
+--]]
+
+local TweenService = game:GetService("TweenService")
+local UserInputService = game:GetService("UserInputService")
+local CoreGui = game:GetService("CoreGui")
+
+-- [CLEANUP] ป้องกัน UI ซ้อนกัน
+if CoreGui:FindFirstChild("SkySound_Expert_V2") then
+    CoreGui.SkySound_Expert_V2:Destroy()
+end
+
+local ScreenGui = Instance.new("ScreenGui")
+ScreenGui.Name = "SkySound_Expert_V2"
+ScreenGui.Parent = CoreGui
+
+-- [HELPER] ระบบแจ้งเตือน (Notifications)
+local function Notify(text)
+    local Notif = Instance.new("TextLabel")
+    Notif.Size = UDim2.new(0, 250, 0, 35)
+    Notif.Position = UDim2.new(0.5, -125, 0.85, 0)
+    Notif.BackgroundColor3 = Color3.fromRGB(15, 0, 0)
+    Notif.TextColor3 = Color3.fromRGB(255, 50, 50)
+    Notif.Text = ">> " .. text .. " <<"
+    Notif.Font = Enum.Font.SpecialElite
+    Notif.TextSize = 14
+    Notif.BorderSizePixel = 0
+    Notif.Parent = ScreenGui
+    Instance.new("UIStroke", Notif).Color = Color3.fromRGB(255, 0, 0)
+
+    TweenService:Create(Notif, TweenInfo.new(0.4), {Position = UDim2.new(0.5, -125, 0.8, 0)}):Play()
+    task.delay(2, function()
+        TweenService:Create(Notif, TweenInfo.new(0.5), {TextTransparency = 1, BackgroundTransparency = 1}):Play()
+        task.wait(0.5); Notif:Destroy()
+    end)
+end
+
+-- [MAIN_UI] หน้าต่างหลักขนาดกะทัดรัด
+local MainFrame = Instance.new("Frame")
+MainFrame.Name = "Main"
+MainFrame.Parent = ScreenGui
+MainFrame.BackgroundColor3 = Color3.fromRGB(10, 10, 10)
+MainFrame.Position = UDim2.new(0.5, -175, 0.5, -125)
+MainFrame.Size = UDim2.new(0, 350, 0, 250)
+MainFrame.Active = true
+MainFrame.Draggable = true
+MainFrame.ClipsDescendants = true
+Instance.new("UIStroke", MainFrame).Color = Color3.fromRGB(255, 0, 0)
+
+-- [HEADER] ส่วนหัวและปุ่มย่อหน้าต่าง
+local Header = Instance.new("Frame")
+Header.Size = UDim2.new(1, 0, 0, 30)
+Header.BackgroundColor3 = Color3.fromRGB(45, 0, 0)
+Header.Parent = MainFrame
+
+local Title = Instance.new("TextLabel")
+Title.Text = "SYSTEM BREACHER V2"
+Title.Size = UDim2.new(1, -60, 1, 0)
+Title.Position = UDim2.new(0, 10, 0, 0)
+Title.TextColor3 = Color3.fromRGB(255, 255, 255)
+Title.Font = Enum.Font.SpecialElite
+Title.TextSize = 14
+Title.TextXAlignment = Enum.TextXAlignment.Left
+Title.BackgroundTransparency = 1
+Title.Parent = Header
+
+local MinBtn = Instance.new("TextButton")
+MinBtn.Text = "_"
+MinBtn.Size = UDim2.new(0, 30, 1, 0)
+MinBtn.Position = UDim2.new(1, -30, 0, 0)
+MinBtn.BackgroundColor3 = Color3.fromRGB(70, 0, 0)
+MinBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+MinBtn.Parent = Header
+
+local IsMinimized = false
+MinBtn.MouseButton1Click:Connect(function()
+    IsMinimized = not IsMinimized
+    local targetSize = IsMinimized and UDim2.new(0, 350, 0, 30) or UDim2.new(0, 350, 0, 250)
+    TweenService:Create(MainFrame, TweenInfo.new(0.3), {Size = targetSize}):Play()
+end)
+
+-- [CONTROLS] ปุ่มคำสั่งหลัก
+local ToolBar = Instance.new("Frame")
+ToolBar.Size = UDim2.new(1, -10, 0, 30)
+ToolBar.Position = UDim2.new(0, 5, 0, 35)
+ToolBar.BackgroundTransparency = 1
+ToolBar.Parent = MainFrame
+
+local function CreateBtn(name, pos, color)
+    local b = Instance.new("TextButton")
+    b.Text = name
+    b.Size = UDim2.new(0.48, 0, 1, 0)
+    b.Position = pos
+    b.BackgroundColor3 = Color3.fromRGB(25, 25, 25)
+    b.TextColor3 = color
+    b.Font = Enum.Font.GothamBold
+    b.TextSize = 10
+    b.Parent = ToolBar
+    Instance.new("UIStroke", b).Color = color
+    return b
+end
+
+local SelectBtn = CreateBtn("🔍 INSPECT OBJECT", UDim2.new(0, 0, 0, 0), Color3.fromRGB(255, 50, 50))
+local ScanBtn = CreateBtn("📡 SCAN REMOTES", UDim2.new(0.52, 0, 0, 0), Color3.fromRGB(255, 200, 0))
+
+-- [LIST_VIEW] ส่วนแสดงผลไฟล์ที่พบ
+local ContentFrame = Instance.new("ScrollingFrame")
+ContentFrame.Size = UDim2.new(1, -10, 1, -75)
+ContentFrame.Position = UDim2.new(0, 5, 0, 70)
+ContentFrame.BackgroundTransparency = 1
+ContentFrame.ScrollBarThickness = 2
+ContentFrame.Parent = MainFrame
+
+local UIList = Instance.new("UIListLayout")
+UIList.Parent = ContentFrame
+UIList.Padding = UDim.new(0, 5)
+
+-- [FACTORY] ฟังก์ชันสร้างรายการข้อมูล (พร้อมปุ่มก๊อปปี้)
+local function AddItem(name, typeInfo, modelInfo, details, fullPath)
+    local Card = Instance.new("Frame")
+    Card.Size = UDim2.new(1, -5, 0, 65)
+    Card.BackgroundColor3 = Color3.fromRGB(20, 20, 20)
+    Card.Parent = ContentFrame
+    Card.BorderSizePixel = 0
+
+    local Accent = Instance.new("Frame")
+    Accent.Size = UDim2.new(0, 3, 1, 0)
+    Accent.BackgroundColor3 = Color3.fromRGB(255, 0, 0)
+    Accent.BorderSizePixel = 0
+    Accent.Parent = Card
+
+    local NameLabel = Instance.new("TextLabel")
+    NameLabel.Text = "[" .. typeInfo .. "] " .. name
+    NameLabel.Size = UDim2.new(1, -80, 0, 20)
+    NameLabel.Position = UDim2.new(0, 10, 0, 5)
+    NameLabel.TextColor3 = Color3.fromRGB(255, 50, 50)
+    NameLabel.Font = Enum.Font.GothamBold
+    NameLabel.TextSize = 11
+    NameLabel.TextXAlignment = Enum.TextXAlignment.Left
+    NameLabel.BackgroundTransparency = 1
+    NameLabel.Parent = Card
+
+    local DescLabel = Instance.new("TextLabel")
+    DescLabel.Text = "MOD: " .. modelInfo .. " | " .. details
+    DescLabel.Size = UDim2.new(1, -15, 0, 30)
+    DescLabel.Position = UDim2.new(0, 10, 0, 25)
+    DescLabel.TextColor3 = Color3.fromRGB(160, 160, 160)
+    DescLabel.Font = Enum.Font.Gotham
+    DescLabel.TextSize = 9
+    DescLabel.TextXAlignment = Enum.TextXAlignment.Left
+    DescLabel.TextWrapped = true
+    DescLabel.BackgroundTransparency = 1
+    DescLabel.Parent = Card
+
+    -- [COPY_BUTTON] ปุ่มก๊อปปี้เส้นทางไฟล์
+    local CopyBtn = Instance.new("TextButton")
+    CopyBtn.Text = "COPY"
+    CopyBtn.Size = UDim2.new(0, 50, 0, 20)
+    CopyBtn.Position = UDim2.new(1, -55, 0, 5)
+    CopyBtn.BackgroundColor3 = Color3.fromRGB(40, 0, 0)
+    CopyBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+    CopyBtn.Font = Enum.Font.GothamBold
+    CopyBtn.TextSize = 9
+    CopyBtn.Parent = Card
+
+    CopyBtn.MouseButton1Click:Connect(function()
+        setclipboard(tostring(fullPath))
+        CopyBtn.Text = "DONE!"
+        Notify("PATH COPIED TO CLIPBOARD")
+        task.wait(1)
+        CopyBtn.Text = "COPY"
+    end)
+
+    ContentFrame.CanvasSize = UDim2.new(0, 0, 0, UIList.AbsoluteContentSize.Y)
+end
+
+-- [LOGIC] ระบบคลิกเลือกวัตถุและแสกน
+SelectBtn.MouseButton1Click:Connect(function()
+    Notify("SELECTING... CLICK ON A PART")
+    local Conn; Conn = UserInputService.InputBegan:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.MouseButton1 then
+            local target = game.Players.LocalPlayer:GetMouse().Target
+            if target then
+                for _, v in pairs(ContentFrame:GetChildren()) do if v:IsA("Frame") then v:Destroy() end end
+                AddItem(target.Name, "OBJ", target.ClassName, "Found in workspace", target:GetFullName())
+                for _, child in pairs(target:GetDescendants()) do
+                    if child:IsA("RemoteEvent") or child:IsA("RemoteFunction") or child:IsA("Script") then
+                        AddItem(child.Name, "FILE", child.ClassName, "Internal Component", child:GetFullName())
+                    end
+                end
+            end
+            Conn:Disconnect()
+        end
+    end)
+end)
+
+ScanBtn.MouseButton1Click:Connect(function()
+    Notify("SCANNING GLOBAL REMOTES")
+    for _, v in pairs(game:GetDescendants()) do
+        if v:IsA("RemoteEvent") then AddItem(v.Name, "REMOTE", "Event", "Network Trigger", v:GetFullName()) end
+    end
+end)
+
+Notify("SKY SOUND V2 READY")
