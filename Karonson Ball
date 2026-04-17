@@ -1,0 +1,181 @@
+-- [[ Karonson V6.3 [Local Bring] - Ultimate Edition ]] --
+local Player = game.Players.LocalPlayer
+local UserInputService = game:GetService("UserInputService")
+
+local function getRoot()
+    return Player.Character and Player.Character:FindFirstChild("HumanoidRootPart")
+end
+
+-- ลบ UI เก่า
+if game:GetService("CoreGui"):FindFirstChild("KaronsonUI") then
+    game:GetService("CoreGui").KaronsonUI:Destroy()
+end
+
+local ScreenGui = Instance.new("ScreenGui")
+local MainFrame = Instance.new("Frame")
+local Title = Instance.new("TextLabel")
+local ToggleBallBtn = Instance.new("TextButton")
+local ToggleSellBtn = Instance.new("TextButton")
+local WarpPointBtn = Instance.new("TextButton")
+local BringLocalBtn = Instance.new("TextButton") -- ปุ่มใหม่สำหรับ BallesEnJeu_Local
+
+getgenv().KaronsonEnabled = false
+getgenv().AutoSellEnabled = false
+
+-- พิกัดปุ่ม Warp Point เดิม
+local TargetCFrame = CFrame.new(-55.5803986, 315.357513, -6.00833988, -0.150166988, 0.988637567, 0.00675886869, -0.0318423808, -0.0116692781, 0.999424815, 0.988147736, 0.149865419, 0.0332329273)
+
+-- พิกัดใหม่สำหรับดึงบอล Local
+local LocalBallCFrame = CFrame.new(-131.109329, 16.1499996, -18.6153698, 1, 0, 0, 0, 1, 0, 0, 0, 1)
+
+ScreenGui.Name = "KaronsonUI"
+ScreenGui.Parent = game:GetService("CoreGui")
+MainFrame.Parent = ScreenGui
+MainFrame.Size = UDim2.new(0, 220, 0, 280) -- ขยายขนาด UI เพื่อรองรับปุ่มเพิ่ม
+MainFrame.Position = UDim2.new(0.5, -110, 0.5, -140)
+MainFrame.BackgroundColor3 = Color3.fromRGB(25, 0, 0)
+MainFrame.Active = true
+Instance.new("UICorner", MainFrame)
+
+-- [[ ระบบลาก UI แบบ Smooth Drag ]] --
+local dragging, dragInput, dragStart, startPos
+local function update(input)
+    local delta = input.Position - dragStart
+    MainFrame.Position = UDim2.new(startPos.X.Scale, startPos.X.Offset + delta.X, startPos.Y.Scale, startPos.Y.Offset + delta.Y)
+end
+
+MainFrame.InputBegan:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+        dragging = true; dragStart = input.Position; startPos = MainFrame.Position
+        input.Changed:Connect(function()
+            if input.UserInputState == Enum.UserInputState.End then dragging = false end
+        end)
+    end
+end)
+MainFrame.InputChanged:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch then
+        dragInput = input
+    end
+end)
+UserInputService.InputChanged:Connect(function(input)
+    if input == dragInput and dragging then update(input) end
+end)
+
+-- [[ UI Elements Setup ]] --
+Title.Parent = MainFrame
+Title.Size = UDim2.new(1, 0, 0, 40)
+Title.Text = "KARONSON V6.3 [LOCAL]"
+Title.TextColor3 = Color3.fromRGB(255, 0, 0)
+Title.Font = Enum.Font.SpecialElite
+Title.BackgroundTransparency = 1
+
+ToggleBallBtn.Parent = MainFrame
+ToggleBallBtn.Size = UDim2.new(0.9, 0, 0, 40)
+ToggleBallBtn.Position = UDim2.new(0.05, 0, 0.15, 0)
+ToggleBallBtn.BackgroundColor3 = Color3.fromRGB(80, 0, 0)
+ToggleBallBtn.Text = "Auto Collect: OFF"
+ToggleBallBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+ToggleBallBtn.Font = Enum.Font.SpecialElite
+Instance.new("UICorner", ToggleBallBtn)
+
+ToggleSellBtn.Parent = MainFrame
+ToggleSellBtn.Size = UDim2.new(0.9, 0, 0, 40)
+ToggleSellBtn.Position = UDim2.new(0.05, 0, 0.32, 0)
+ToggleSellBtn.BackgroundColor3 = Color3.fromRGB(80, 0, 0)
+ToggleSellBtn.Text = "Auto Sell: OFF"
+ToggleSellBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+ToggleSellBtn.Font = Enum.Font.SpecialElite
+Instance.new("UICorner", ToggleSellBtn)
+
+WarpPointBtn.Parent = MainFrame
+WarpPointBtn.Size = UDim2.new(0.9, 0, 0, 40)
+WarpPointBtn.Position = UDim2.new(0.05, 0, 0.50, 0)
+WarpPointBtn.BackgroundColor3 = Color3.fromRGB(120, 0, 0)
+WarpPointBtn.Text = "Warp To Point"
+WarpPointBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+WarpPointBtn.Font = Enum.Font.SpecialElite
+Instance.new("UICorner", WarpPointBtn)
+
+BringLocalBtn.Parent = MainFrame
+BringLocalBtn.Size = UDim2.new(0.9, 0, 0, 40)
+BringLocalBtn.Position = UDim2.new(0.05, 0, 0.68, 0)
+BringLocalBtn.BackgroundColor3 = Color3.fromRGB(0, 80, 150)
+BringLocalBtn.Text = "Bring Balls Local"
+BringLocalBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+BringLocalBtn.Font = Enum.Font.SpecialElite
+Instance.new("UICorner", BringLocalBtn)
+
+-- [[ ฟังก์ชันการทำงานเดิม ]] --
+local function smartInteract(obj)
+    local root = getRoot()
+    if not obj or not root then return end
+    root.CFrame = obj:GetPivot()
+    task.wait(0.1)
+    local tool = Player.Backpack:FindFirstChildOfClass("Tool")
+    if tool then Player.Character.Humanoid:EquipTool(tool) end
+    local p = obj:FindFirstChildOfClass("ProximityPrompt") or obj:FindFirstChildWhichIsA("ProximityPrompt", true)
+    if p then
+        p.MaxActivationDistance = math.huge; p.HoldDuration = 0
+        p:InputHoldBegin(); task.wait(0.1); p:InputHoldEnd()
+    end
+end
+
+local function getPriorityBall()
+    local target = nil; local maxVal = -1
+    for _, v in pairs(game.Workspace:GetDescendants()) do
+        if v.Name:find("Ball") and (v:FindFirstChildOfClass("ProximityPrompt") or v:FindFirstChildWhichIsA("ProximityPrompt", true)) then
+            local value = tonumber(v.Name:match("%d+")) or 0
+            if value > maxVal then maxVal = value; target = v end
+        end
+    end
+    if not target then
+        for _, v in pairs(game.Workspace:GetDescendants()) do
+            if v.Name:find("Ball") and v:FindFirstChildOfClass("ProximityPrompt") then return v end
+        end
+    end
+    return target
+end
+
+-- [[ Loop ระบบ Auto ]] --
+task.spawn(function()
+    while task.wait(0.1) do
+        if getgenv().KaronsonEnabled then
+            local ball = getPriorityBall()
+            if ball then smartInteract(ball) end
+        end
+        if getgenv().AutoSellEnabled then
+            local recap = game.Workspace:FindFirstChild("Recuperateur", true)
+            if recap then smartInteract(recap) end
+        end
+    end
+end)
+
+-- [[ Event ปุ่มต่างๆ ]] --
+ToggleBallBtn.MouseButton1Click:Connect(function()
+    getgenv().KaronsonEnabled = not getgenv().KaronsonEnabled
+    ToggleBallBtn.Text = getgenv().KaronsonEnabled and "Auto Collect: ON" or "Auto Collect: OFF"
+    ToggleBallBtn.BackgroundColor3 = getgenv().KaronsonEnabled and Color3.fromRGB(0, 120, 0) or Color3.fromRGB(80, 0, 0)
+end)
+
+ToggleSellBtn.MouseButton1Click:Connect(function()
+    getgenv().AutoSellEnabled = not getgenv().AutoSellEnabled
+    ToggleSellBtn.Text = getgenv().AutoSellEnabled and "Auto Sell: ON" or "Auto Sell: OFF"
+    ToggleSellBtn.BackgroundColor3 = getgenv().AutoSellEnabled and Color3.fromRGB(0, 120, 0) or Color3.fromRGB(80, 0, 0)
+end)
+
+WarpPointBtn.MouseButton1Click:Connect(function()
+    local root = getRoot()
+    if root then root.CFrame = TargetCFrame end
+end)
+
+-- ปุ่ม Bring Balls Local: วาร์ปพาร์ททั้งหมดในโฟลเดอร์มาหาพิกัด
+BringLocalBtn.MouseButton1Click:Connect(function()
+    local folder = game.Workspace:FindFirstChild("BallesEnJeu_Local")
+    if folder then
+        for _, v in pairs(folder:GetDescendants()) do
+            if v:IsA("BasePart") then
+                v.CFrame = LocalBallCFrame
+            end
+        end
+    end
+end)
