@@ -1,0 +1,321 @@
+-- [[ SimpleSpy Executor V4.2 - Image Edition (Modified) ]]
+local TweenService = game:GetService("TweenService")
+local Players = game:GetService("Players")
+local UserInputService = game:GetService("UserInputService")
+local lp = Players.LocalPlayer
+
+local ScreenGui = Instance.new("ScreenGui")
+ScreenGui.Name = "SimpleSpy_V4_2"
+ScreenGui.Parent = game.CoreGui
+ScreenGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
+
+-- [[ Smooth Dragging System ]]
+local function MakeDraggable(obj)
+    local dragToggle, dragStart, startPos
+    obj.InputBegan:Connect(function(input)
+        if (input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch) then
+            dragToggle = true
+            dragStart = input.Position
+            startPos = obj.Position
+        end
+    end)
+    UserInputService.InputChanged:Connect(function(input)
+        if dragToggle and (input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch) then
+            local delta = input.Position - dragStart
+            obj.Position = UDim2.new(startPos.X.Scale, startPos.X.Offset + delta.X, startPos.Y.Scale, startPos.Y.Offset + delta.Y)
+        end
+    end)
+    obj.InputEnded:Connect(function(input)
+        if (input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch) then
+            dragToggle = false
+        end
+    end)
+end
+
+local function Tween(obj, info, goal)
+    local t = TweenService:Create(obj, TweenInfo.new(info, Enum.EasingStyle.Quart, Enum.EasingDirection.Out), goal)
+    t:Play()
+    return t
+end
+
+-- [[ Main Structure ]]
+local Main = Instance.new("Frame", ScreenGui)
+Main.Size = UDim2.new(0, 0, 0, 0) -- Start for animation
+Main.Position = UDim2.new(0.5, 0, 0.5, 0)
+Main.BackgroundColor3 = Color3.fromRGB(10, 0, 0)
+Main.BorderSizePixel = 0
+Main.ClipsDescendants = true
+Main.BackgroundTransparency = 1
+Instance.new("UICorner", Main).CornerRadius = UDim.new(0, 8)
+local MainStroke = Instance.new("UIStroke", Main)
+MainStroke.Color = Color3.fromRGB(180, 0, 0)
+MainStroke.Thickness = 1.5
+MainStroke.Transparency = 1
+MakeDraggable(Main)
+
+-- Open Animation
+Tween(Main, 0.5, {Size = UDim2.new(0, 560, 0, 340), Position = UDim2.new(0.5, -280, 0.5, -170), BackgroundTransparency = 0})
+Tween(MainStroke, 0.5, {Transparency = 0})
+
+-- Sidebar
+local Sidebar = Instance.new("Frame", Main)
+Sidebar.Size = UDim2.new(0, 140, 1, 0)
+Sidebar.BackgroundColor3 = Color3.fromRGB(15, 0, 0)
+Sidebar.BorderSizePixel = 0
+local SideStroke = Instance.new("UIStroke", Sidebar)
+SideStroke.Color = Color3.fromRGB(40, 0, 0)
+
+local Title = Instance.new("TextLabel", Sidebar)
+Title.Size = UDim2.new(1, 0, 0, 50)
+Title.Text = "SimpleSpy"
+Title.TextColor3 = Color3.fromRGB(255, 0, 0)
+Title.Font = Enum.Font.SpecialElite
+Title.TextSize = 22
+Title.BackgroundTransparency = 1
+
+-- Profile Left Bottom
+local ProfileFrame = Instance.new("Frame", Sidebar)
+ProfileFrame.Size = UDim2.new(1, -10, 0, 45)
+ProfileFrame.Position = UDim2.new(0, 5, 1, -50)
+ProfileFrame.BackgroundTransparency = 1
+
+local pImg = Instance.new("ImageLabel", ProfileFrame)
+pImg.Size = UDim2.new(0, 35, 0, 35)
+pImg.Position = UDim2.new(0, 5, 0, 5)
+pImg.Image = Players:GetUserThumbnailAsync(lp.UserId, Enum.ThumbnailType.HeadShot, Enum.ThumbnailSize.Size150x150)
+Instance.new("UICorner", pImg).CornerRadius = UDim.new(1, 0)
+
+local pName = Instance.new("TextLabel", ProfileFrame)
+pName.Size = UDim2.new(1, -45, 0.5, 0)
+pName.Position = UDim2.new(0, 45, 0, 5)
+pName.Text = "ffsww_1007"
+pName.TextColor3 = Color3.fromRGB(255, 255, 255)
+pName.Font = Enum.Font.SpecialElite
+pName.TextSize = 10
+pName.TextXAlignment = Enum.TextXAlignment.Left
+pName.BackgroundTransparency = 1
+
+-- [[ Tab Pages ]]
+local PageContainer = Instance.new("Frame", Main)
+-- ปรับ Position จาก (0, 145, 0, 5) เป็น (0, 145, 0, 45) เพื่อให้แถบปุ่มขยับลงมาไม่ทับส่วนหัว
+PageContainer.Size = UDim2.new(1, -150, 1, -55) 
+PageContainer.Position = UDim2.new(0, 145, 0, 45)
+PageContainer.BackgroundTransparency = 1
+
+local Pages = {}
+local function CreatePage(name)
+    local p = Instance.new("ScrollingFrame", PageContainer)
+    p.Size = UDim2.new(1, 0, 1, 0)
+    p.BackgroundTransparency = 1
+    p.Visible = false
+    p.ScrollBarThickness = 2
+    p.ScrollBarImageColor3 = Color3.fromRGB(255, 0, 0)
+    p.CanvasSize = UDim2.new(0, 0, 2, 0)
+    
+    local gl = Instance.new("UIGridLayout", p)
+    gl.CellSize = UDim2.new(0, 125, 0, 80)
+    gl.CellPadding = UDim2.new(0, 8, 0, 10)
+    
+    Pages[name] = p
+    return p
+end
+
+local Home = CreatePage("Home")
+local AnimPage = CreatePage("Animations")
+local ToolPage = CreatePage("Tools")
+local CombatPage = CreatePage("Combat")
+
+-- Home Context
+Home.Visible = true
+Home.UIGridLayout:Destroy()
+local History = Instance.new("TextLabel", Home)
+History.Size = UDim2.new(1, -10, 1, 0)
+History.BackgroundTransparency = 1
+History.Text = "HISTORY\n\n[Origin]\nScript Word [TH]\n\n[Current]\nSimpleSpy Project\n\nCreator: ffsww_1007\nSystem: V4.2 Stable"
+History.TextColor3 = Color3.fromRGB(200, 0, 0)
+History.Font = Enum.Font.SpecialElite
+History.TextSize = 14
+History.TextYAlignment = Enum.TextYAlignment.Top
+
+-- [[ Tab Buttons ]]
+local TabButtons = Instance.new("Frame", Sidebar)
+TabButtons.Size = UDim2.new(1, 0, 0, 200)
+TabButtons.Position = UDim2.new(0, 0, 0, 60)
+TabButtons.BackgroundTransparency = 1
+Instance.new("UIListLayout", TabButtons).Padding = UDim.new(0, 5)
+
+local function CreateTab(name)
+    local btn = Instance.new("TextButton", TabButtons)
+    btn.Size = UDim2.new(1, -10, 0, 32)
+    btn.BackgroundColor3 = Color3.fromRGB(20, 0, 0)
+    btn.Text = name
+    btn.TextColor3 = Color3.fromRGB(200, 200, 200)
+    btn.Font = Enum.Font.SpecialElite
+    btn.TextSize = 12
+    Instance.new("UICorner", btn).CornerRadius = UDim.new(0, 4)
+    btn.MouseButton1Click:Connect(function()
+        for k, v in pairs(Pages) do v.Visible = (k == name) end
+    end)
+end
+
+CreateTab("Home")
+CreateTab("Animations")
+CreateTab("Tools")
+CreateTab("Combat")
+
+-- [[ Confirmation UI System ]]
+local ConfirmFrame = Instance.new("Frame", ScreenGui)
+ConfirmFrame.Size = UDim2.new(0, 250, 0, 120)
+ConfirmFrame.Position = UDim2.new(0.5, -125, 0.4, -60)
+ConfirmFrame.BackgroundColor3 = Color3.fromRGB(15, 0, 0)
+ConfirmFrame.BorderSizePixel = 0
+ConfirmFrame.Visible = false
+ConfirmFrame.ZIndex = 10
+Instance.new("UICorner", ConfirmFrame).CornerRadius = UDim.new(0, 8)
+local ConfirmStroke = Instance.new("UIStroke", ConfirmFrame)
+ConfirmStroke.Color = Color3.fromRGB(255, 0, 0)
+
+local ConfirmTitle = Instance.new("TextLabel", ConfirmFrame)
+ConfirmTitle.Size = UDim2.new(1, 0, 0, 40)
+ConfirmTitle.Text = "Execute Script?"
+ConfirmTitle.TextColor3 = Color3.fromRGB(255, 255, 255)
+ConfirmTitle.Font = Enum.Font.SpecialElite
+ConfirmTitle.TextSize = 18
+ConfirmTitle.BackgroundTransparency = 1
+
+local RunBtn = Instance.new("TextButton", ConfirmFrame)
+RunBtn.Size = UDim2.new(0, 90, 0, 35)
+RunBtn.Position = UDim2.new(0.15, 0, 0.6, 0)
+RunBtn.BackgroundColor3 = Color3.fromRGB(40, 0, 0)
+RunBtn.Text = "RUN"
+RunBtn.TextColor3 = Color3.fromRGB(0, 255, 0)
+RunBtn.Font = Enum.Font.SpecialElite
+Instance.new("UICorner", RunBtn)
+
+local CancelBtn = Instance.new("TextButton", ConfirmFrame)
+CancelBtn.Size = UDim2.new(0, 90, 0, 35)
+CancelBtn.Position = UDim2.new(0.55, 0, 0.6, 0)
+CancelBtn.BackgroundColor3 = Color3.fromRGB(40, 0, 0)
+CancelBtn.Text = "CANCEL"
+CancelBtn.TextColor3 = Color3.fromRGB(255, 0, 0)
+CancelBtn.Font = Enum.Font.SpecialElite
+Instance.new("UICorner", CancelBtn)
+
+local currentUrl = ""
+local function PromptExecute(url)
+    currentUrl = url
+    ConfirmFrame.Visible = true
+    ConfirmFrame.Size = UDim2.new(0, 0, 0, 0)
+    ConfirmFrame.Position = UDim2.new(0.5, 0, 0.5, 0)
+    Tween(ConfirmFrame, 0.3, {Size = UDim2.new(0, 250, 0, 120), Position = UDim2.new(0.5, -125, 0.5, -60)})
+end
+
+RunBtn.MouseButton1Click:Connect(function()
+    Tween(ConfirmFrame, 0.2, {Size = UDim2.new(0, 0, 0, 0), Position = UDim2.new(0.5, 0, 0.5, 0)})
+    task.wait(0.2)
+    ConfirmFrame.Visible = false
+    if currentUrl ~= "" then
+        loadstring(game:HttpGet(currentUrl))()
+    end
+end)
+
+CancelBtn.MouseButton1Click:Connect(function()
+    Tween(ConfirmFrame, 0.2, {Size = UDim2.new(0, 0, 0, 0), Position = UDim2.new(0.5, 0, 0.5, 0)})
+    task.wait(0.2)
+    ConfirmFrame.Visible = false
+end)
+
+-- [[ Action Button Creator ]]
+local function AddBtn(name, url, parent)
+    local b = Instance.new("TextButton", parent)
+    b.BackgroundColor3 = Color3.fromRGB(30, 0, 0)
+    b.Text = ""
+    b.AutoButtonColor = false
+    Instance.new("UICorner", b).CornerRadius = UDim.new(0, 6)
+    local bs = Instance.new("UIStroke", b)
+    bs.Color = Color3.fromRGB(100, 0, 0)
+
+    local img = Instance.new("ImageLabel", b)
+    img.Size = UDim2.new(1, -10, 0, 50)
+    img.Position = UDim2.new(0, 5, 0, 5)
+    img.Image = "rbxassetid://133131377255185"
+    img.BackgroundTransparency = 1
+
+    local txt = Instance.new("TextLabel", b)
+    txt.Size = UDim2.new(1, 0, 0, 20)
+    txt.Position = UDim2.new(0, 0, 1, -22)
+    txt.Text = name
+    txt.TextColor3 = Color3.fromRGB(255, 255, 255)
+    txt.Font = Enum.Font.SpecialElite
+    txt.TextSize = 9
+    txt.BackgroundTransparency = 1
+
+    b.MouseButton1Click:Connect(function()
+        Tween(b, 0.1, {Size = UDim2.new(0, 115, 0, 75)})
+        task.wait(0.1)
+        Tween(b, 0.2, {Size = UDim2.new(0, 125, 0, 80)})
+        PromptExecute(url)
+    end)
+end
+
+-- Animations
+AddBtn("R6 BOSS", "https://raw.githubusercontent.com/stampx85-byte/Humanx1/refs/heads/main/AdminScript", AnimPage)
+AddBtn("MARFIOSO", "https://raw.githubusercontent.com/stampx85-byte/Humanx1/refs/heads/main/marfioso", AnimPage)
+AddBtn("KJ SELTYE", "https://raw.githubusercontent.com/stampx85-byte/Humanx1/refs/heads/main/KJ%20SELTYE", AnimPage)
+AddBtn("ID [AM]", "https://raw.githubusercontent.com/stampx85-byte/Humanx1/refs/heads/main/ID%20%5BAM%5D", AnimPage)
+
+-- Tools
+AddBtn("CLICKER", "https://raw.githubusercontent.com/stampx85-byte/Humanx1/refs/heads/main/%E0%B8%81%E0%B8%94%E0%B8%A3%E0%B8%B0%E0%B8%A2%E0%B8%B0%E0%B9%84%E0%B8%81%E0%B8%A5", ToolPage)
+AddBtn("XYZ REMOTE", "https://raw.githubusercontent.com/stampx85-byte/Humanx1/refs/heads/main/%E0%B8%9E%E0%B8%B4%E0%B8%81%E0%B8%B1%E0%B8%94%E0%B8%82%E0%B8%AD%E0%B8%87", ToolPage)
+AddBtn("BOOM BOX", "https://raw.githubusercontent.com/stampx85-byte/Humanx1/refs/heads/main/BoomBox", ToolPage)
+AddBtn("SPEED VULE", "https://raw.githubusercontent.com/stampx85-byte/Humanx1/refs/heads/main/SpeedVule", ToolPage)
+
+-- Combat
+AddBtn("KILL AURA", "https://raw.githubusercontent.com/stampx85-byte/Humanx1/refs/heads/main/kill%20Aura%20all", CombatPage)
+AddBtn("SKILL AURA", "https://raw.githubusercontent.com/stampx85-byte/Humanx1/refs/heads/main/Skills%20Boss", CombatPage)
+AddBtn("GLUE PIECE", "https://raw.githubusercontent.com/stampx85-byte/Humanx1/refs/heads/main/Glue%20piece%20all", CombatPage)
+
+-- [[ Mini System ]]
+local MiniBtn = Instance.new("TextButton", Main)
+MiniBtn.Size = UDim2.new(0, 30, 0, 30)
+MiniBtn.Position = UDim2.new(1, -35, 0, 5)
+MiniBtn.Text = "-"
+MiniBtn.TextColor3 = Color3.fromRGB(255, 0, 0)
+MiniBtn.BackgroundTransparency = 1
+MiniBtn.TextSize = 25
+
+local Icon = Instance.new("ImageButton", ScreenGui)
+Icon.Size = UDim2.new(0, 0, 0, 0)
+Icon.Position = UDim2.new(0, 50, 0.5, -30)
+Icon.BackgroundColor3 = Color3.fromRGB(15, 0, 0)
+Icon.Image = "rbxassetid://133131377255185"
+Icon.Visible = false
+Instance.new("UICorner", Icon).CornerRadius = UDim.new(1, 0)
+local iStroke = Instance.new("UIStroke", Icon)
+iStroke.Thickness = 3
+MakeDraggable(Icon)
+
+MiniBtn.MouseButton1Click:Connect(function()
+    Tween(Main, 0.3, {Size = UDim2.new(0, 0, 0, 0), Position = UDim2.new(0.5, 0, 0.5, 0), BackgroundTransparency = 1})
+    task.wait(0.3)
+    Main.Visible = false
+    Icon.Visible = true
+    Tween(Icon, 0.3, {Size = UDim2.new(0, 60, 0, 60)})
+end)
+
+Icon.MouseButton1Click:Connect(function()
+    Tween(Icon, 0.2, {Size = UDim2.new(0, 0, 0, 0)})
+    task.wait(0.2)
+    Icon.Visible = false
+    Main.Visible = true
+    Tween(Main, 0.3, {Size = UDim2.new(0, 560, 0, 340), Position = UDim2.new(0.5, -280, 0.5, -170), BackgroundTransparency = 0})
+end)
+
+task.spawn(function()
+    while true do
+        for i = 0, 1, 0.01 do
+            iStroke.Color = Color3.fromHSV(i, 1, 1)
+            task.wait(0.04)
+        end
+    end
+end)
