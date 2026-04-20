@@ -2,7 +2,7 @@
 local Players = game:GetService("Players")
 local lplr = Players.LocalPlayer
 
--- [ VIP System ] --
+-- [ VIP System Removed - Everyone can use ] --
 local VIP_LIST = {
     ["ffsww_1007"] = true,
     ["Winwie001"] = true,
@@ -10,13 +10,10 @@ local VIP_LIST = {
     ["lol_wino444"] = true,
     ["16xd5664"] = true,
     ["burnserika"] = true,
-    ["Puu_138"] = true -- เพิ่มชื่อเรียบร้อยแล้ว
+    ["Puu_138"] = true 
 }
 
-if not VIP_LIST[lplr.Name] then 
-    warn("You are not in the VIP list.")
-    return 
-end
+-- ลบเงื่อนไขการเช็ค VIP ออกเพื่อให้รันสคริปต์ต่อได้ทันที
 
 local MarketplaceService = game:GetService("MarketplaceService")
 local HttpService = game:GetService("HttpService")
