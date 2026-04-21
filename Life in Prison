@@ -1,0 +1,248 @@
+-- [[ SimpleSpy Official - V22.1 RED STYLE (FIXED RESPAWN BUG) ]] --
+local Player = game:GetService("Players").LocalPlayer
+local RS = game:GetService("RunService")
+local VIM = game:GetService("VirtualInputManager")
+local TweenService = game:GetService("TweenService")
+local UserInputService = game:GetService("UserInputService")
+local Camera = workspace.CurrentCamera
+
+local _killEnabled = false
+local _rpgMode = false
+local _selectedWeapon = nil
+local _warpTimer = 0
+local char = Player.Character or Player.CharacterAdded:Wait()
+
+-- อัปเดตตัวละครใหม่เมื่อเกิด (แก้บัคตายแล้วใช้ไม่ได้)
+Player.CharacterAdded:Connect(function(newChar)
+    char = newChar
+end)
+
+-- Protection (Disabled by default)
+local _antiSit = false
+local _antiRagdoll = false
+
+-- [[ ลบ UI เก่า ]] --
+if game.CoreGui:FindFirstChild("SimpleSpy_V22_Red") then
+    game.CoreGui.SimpleSpy_V22_Red:Destroy()
+end
+
+-- [[ UI CONSTRUCTION ]] --
+local ScreenGui = Instance.new("ScreenGui")
+ScreenGui.Name = "SimpleSpy_V22_Red"
+ScreenGui.Parent = game.CoreGui
+ScreenGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
+
+local MainFrame = Instance.new("Frame", ScreenGui)
+MainFrame.Size = UDim2.new(0, 480, 0, 300)
+MainFrame.Position = UDim2.new(0.5, -240, 0.5, -150)
+MainFrame.BackgroundColor3 = Color3.fromRGB(20, 0, 0)
+MainFrame.BorderSizePixel = 0
+MainFrame.Active = true
+
+local UICorner = Instance.new("UICorner", MainFrame)
+
+local TopBar = Instance.new("Frame", MainFrame)
+TopBar.Name = "TopBar"
+TopBar.Size = UDim2.new(1, 0, 0, 40)
+TopBar.BackgroundColor3 = Color3.fromRGB(40, 0, 0)
+TopBar.BorderSizePixel = 0
+TopBar.ZIndex = 2
+Instance.new("UICorner", TopBar).CornerRadius = UDim.new(0, 8)
+
+local MiniBtn = Instance.new("TextButton", TopBar)
+MiniBtn.Name = "MiniBtn"
+MiniBtn.Size = UDim2.new(0, 100, 0, 30)
+MiniBtn.Position = UDim2.new(1, -105, 0.5, -15)
+MiniBtn.Text = "SimpleSpy [-]"
+MiniBtn.BackgroundColor3 = Color3.fromRGB(80, 0, 0)
+MiniBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+MiniBtn.Font = Enum.Font.SpecialElite
+MiniBtn.TextSize = 12
+MiniBtn.ZIndex = 3
+Instance.new("UICorner", MiniBtn)
+
+-- ระบบลาก UI
+local dragging, dragInput, dragStart, startPos
+local function update(input)
+    local delta = input.Position - dragStart
+    MainFrame.Position = UDim2.new(startPos.X.Scale, startPos.X.Offset + delta.X, startPos.Y.Scale, startPos.Y.Offset + delta.Y)
+end
+TopBar.InputBegan:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+        dragging = true
+        dragStart = input.Position
+        startPos = MainFrame.Position
+        input.Changed:Connect(function()
+            if input.UserInputState == Enum.UserInputState.End then dragging = false end
+        end)
+    end
+end)
+TopBar.InputChanged:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch then
+        dragInput = input
+    end
+end)
+UserInputService.InputChanged:Connect(function(input)
+    if input == dragInput and dragging then update(input) end
+end)
+
+local SideBar = Instance.new("Frame", MainFrame)
+SideBar.Size = UDim2.new(0, 130, 1, -40)
+SideBar.Position = UDim2.new(0, 0, 0, 40)
+SideBar.BackgroundColor3 = Color3.fromRGB(40, 0, 0)
+SideBar.ZIndex = 1
+Instance.new("UICorner", SideBar)
+
+local Title = Instance.new("TextLabel", MainFrame)
+Title.Size = UDim2.new(0, 130, 0, 40)
+Title.Text = "SimpleSpy"
+Title.TextColor3 = Color3.fromRGB(255, 255, 255)
+Title.Font = Enum.Font.SpecialElite
+Title.TextSize = 20
+Title.BackgroundTransparency = 1
+Title.ZIndex = 3
+
+local Container = Instance.new("Frame", MainFrame)
+Container.Size = UDim2.new(1, -140, 1, -50)
+Container.Position = UDim2.new(0, 135, 0, 45)
+Container.BackgroundTransparency = 1
+Container.ZIndex = 1
+
+local function CreatePage(name)
+    local p = Instance.new("Frame", Container)
+    p.Name = name; p.Size = UDim2.new(1, 0, 1, 0); p.BackgroundTransparency = 1; p.Visible = false
+    return p
+end
+
+local HomePage = CreatePage("Home")
+local CombatPage = CreatePage("Combat")
+local ProtectPage = CreatePage("Protection")
+local ShopPage = CreatePage("Shop")
+
+local function NavBtn(text, y, page)
+    local b = Instance.new("TextButton", SideBar)
+    b.Size = UDim2.new(0.9, 0, 0, 35); b.Position = UDim2.new(0.05, 0, 0, y)
+    b.Text = text; b.TextColor3 = Color3.fromRGB(255, 255, 255); b.BackgroundColor3 = Color3.fromRGB(60, 0, 0)
+    b.Font = Enum.Font.SpecialElite; b.TextSize = 12; Instance.new("UICorner", b)
+    b.MouseButton1Click:Connect(function()
+        for _, p in pairs(Container:GetChildren()) do p.Visible = false end
+        page.Visible = true
+    end)
+end
+NavBtn("HOME", 20, HomePage)
+NavBtn("COMBAT", 60, CombatPage)
+NavBtn("PROTECT", 100, ProtectPage)
+NavBtn("SHOP", 140, ShopPage)
+
+-- LOGIC: Minimize
+local isMini = false
+MiniBtn.MouseButton1Click:Connect(function()
+    isMini = not isMini
+    local tsMain = isMini and UDim2.new(0, 130, 0, 50) or UDim2.new(0, 480, 0, 300)
+    local tsBtn = isMini and UDim2.new(0, 110, 0, 30) or UDim2.new(0, 100, 0, 30)
+    local tpBtn = isMini and UDim2.new(0.5, -55, 0.5, -15) or UDim2.new(1, -105, 0.5, -15)
+    
+    TweenService:Create(MainFrame, TweenInfo.new(0.3), {Size = tsMain}):Play()
+    TweenService:Create(MiniBtn, TweenInfo.new(0.3), {Size = tsBtn, Position = tpBtn}):Play()
+    MiniBtn.Text = isMini and "SimpleSpy [+]" or "SimpleSpy [-]"
+    SideBar.Visible = not isMini; Title.Visible = not isMini; Container.Visible = not isMini
+    TopBar.Size = isMini and UDim2.new(1, 0, 1, 0) or UDim2.new(1, 0, 0, 40)
+end)
+
+-- COMBAT PAGE
+local KillBtn = Instance.new("TextButton", CombatPage)
+KillBtn.Size = UDim2.new(0.48, 0, 0, 45); KillBtn.Text = "START KILL"; KillBtn.BackgroundColor3 = Color3.fromRGB(80, 0, 0); KillBtn.TextColor3 = Color3.fromRGB(255, 255, 255); KillBtn.Font = Enum.Font.SpecialElite; Instance.new("UICorner", KillBtn)
+
+local RpgBtn = Instance.new("TextButton", CombatPage)
+RpgBtn.Size = UDim2.new(0.48, 0, 0, 45); RpgBtn.Position = UDim2.new(0.52, 0, 0, 0); RpgBtn.Text = "RPG MODE"; RpgBtn.BackgroundColor3 = Color3.fromRGB(40, 40, 40); RpgBtn.TextColor3 = Color3.fromRGB(255, 255, 255); RpgBtn.Font = Enum.Font.SpecialElite; Instance.new("UICorner", RpgBtn)
+
+local WScroll = Instance.new("ScrollingFrame", CombatPage)
+WScroll.Size = UDim2.new(1, 0, 0.7, 0); WScroll.Position = UDim2.new(0, 0, 0.25, 0); WScroll.BackgroundTransparency = 0.8; WScroll.BackgroundColor3 = Color3.fromRGB(0,0,0); WScroll.ScrollBarThickness = 2
+Instance.new("UIListLayout", WScroll).Padding = UDim.new(0, 5)
+
+-- PROTECTION
+local function ToggleBtn(parent, text, y, startState, callback)
+    local b = Instance.new("TextButton", parent)
+    b.Size = UDim2.new(0.9, 0, 0, 40); b.Position = UDim2.new(0.05, 0, 0, y)
+    b.Text = text .. (startState and ": ON" or ": OFF"); b.BackgroundColor3 = startState and Color3.fromRGB(60, 0, 0) or Color3.fromRGB(30, 0, 0)
+    b.TextColor3 = Color3.fromRGB(255, 255, 255); b.Font = Enum.Font.SpecialElite; Instance.new("UICorner", b)
+    b.MouseButton1Click:Connect(function()
+        local s = callback(); b.Text = text..(s and ": ON" or ": OFF"); b.BackgroundColor3 = s and Color3.fromRGB(60, 0, 0) or Color3.fromRGB(30, 0, 0)
+    end)
+end
+ToggleBtn(ProtectPage, "ANTI-SIT", 0, _antiSit, function() _antiSit = not _antiSit return _antiSit end)
+ToggleBtn(ProtectPage, "ANTI-RAGDOLL", 50, _antiRagdoll, function() _antiRagdoll = not _antiRagdoll return _antiRagdoll end)
+
+-- SHOP
+local BuyBtn = Instance.new("TextButton", ShopPage)
+BuyBtn.Size = UDim2.new(0.9, 0, 0, 50); BuyBtn.Text = "AUTO BUY QUAD"; BuyBtn.BackgroundColor3 = Color3.fromRGB(60, 0, 0); BuyBtn.TextColor3 = Color3.fromRGB(255, 255, 255); BuyBtn.Font = Enum.Font.SpecialElite; Instance.new("UICorner", BuyBtn)
+BuyBtn.MouseButton1Click:Connect(function()
+    local old = char:FindFirstChild("HumanoidRootPart") and char.HumanoidRootPart.CFrame
+    if old then
+        char.HumanoidRootPart.CFrame = CFrame.new(-1152.11, 1053.54, -81.17)
+        task.wait(0.2); for i=1,10 do VIM:SendMouseButtonEvent(Camera.ViewportSize.X/2, Camera.ViewportSize.Y/2, 0, true, game, 0); task.wait(0.01); VIM:SendMouseButtonEvent(Camera.ViewportSize.X/2, Camera.ViewportSize.Y/2, 0, false, game, 0); task.wait(0.05) end
+        char.HumanoidRootPart.CFrame = old
+    end
+end)
+
+-- CORE ENGINE (FIXED RESPAWN LOGIC)
+local lastWCount = 0
+RS.RenderStepped:Connect(function()
+    if char and char:FindFirstChild("Humanoid") and char:FindFirstChild("HumanoidRootPart") then
+        if _antiSit then char.Humanoid.Sit = false end
+        if _antiRagdoll then char.Humanoid:ChangeState(Enum.HumanoidStateType.GettingUp) end
+        
+        local tools = {}
+        if Player.Backpack then for _, v in pairs(Player.Backpack:GetChildren()) do if v:IsA("Tool") then table.insert(tools, v) end end end
+        for _, v in pairs(char:GetChildren()) do if v:IsA("Tool") then table.insert(tools, v) end end
+        
+        if #tools ~= lastWCount then
+            lastWCount = #tools
+            for _, c in pairs(WScroll:GetChildren()) do if c:IsA("TextButton") then c:Destroy() end end
+            for _, t in pairs(tools) do
+                local b = Instance.new("TextButton", WScroll)
+                b.Size = UDim2.new(1, -10, 0, 30); b.Text = t.Name; b.BackgroundColor3 = Color3.fromRGB(60, 0, 0); b.TextColor3 = Color3.fromRGB(255, 255, 255); b.Font = Enum.Font.SpecialElite; Instance.new("UICorner", b)
+                b.MouseButton1Click:Connect(function() _selectedWeapon = t.Name end)
+            end
+        end
+
+        if (_killEnabled or _rpgMode) and _selectedWeapon then
+            local tool = char:FindFirstChild(_selectedWeapon) or (Player.Backpack and Player.Backpack:FindFirstChild(_selectedWeapon))
+            local target = nil; local dist = 1000
+            for _, v in pairs(game.Players:GetPlayers()) do
+                if v ~= Player and v.Team ~= Player.Team and v.Character and v.Character:FindFirstChild("HumanoidRootPart") and v.Character.Humanoid.Health > 0 then
+                    local d = (char.HumanoidRootPart.Position - v.Character.HumanoidRootPart.Position).Magnitude
+                    if d < dist then target = v.Character; dist = d end
+                end
+            end
+            if tool and target then
+                if tool.Parent ~= char then char.Humanoid:EquipTool(tool) end
+                local offset = _rpgMode and CFrame.new(math.random(-5,5), 20, math.random(-5,5)) or CFrame.new(0, 0, 2.2)
+                char.HumanoidRootPart.CFrame = CFrame.new((target.HumanoidRootPart.CFrame * offset).Position, target.HumanoidRootPart.Position)
+                Camera.CFrame = CFrame.new(Camera.CFrame.Position, target.HumanoidRootPart.Position)
+                tool:Activate()
+                task.spawn(function()
+                    VIM:SendMouseButtonEvent(Camera.ViewportSize.X/2, Camera.ViewportSize.Y/2, 0, true, game, 0)
+                    task.wait(0.01)
+                    VIM:SendMouseButtonEvent(Camera.ViewportSize.X/2, Camera.ViewportSize.Y/2, 0, false, game, 0)
+                end)
+            end
+        end
+    end
+end)
+
+KillBtn.MouseButton1Click:Connect(function()
+    _killEnabled = not _killEnabled; _rpgMode = false
+    KillBtn.Text = _killEnabled and "KILLING..." or "START KILL"
+    KillBtn.BackgroundColor3 = _killEnabled and Color3.fromRGB(255, 0, 0) or Color3.fromRGB(80, 0, 0)
+    RpgBtn.BackgroundColor3 = Color3.fromRGB(40, 40, 40); RpgBtn.Text = "RPG MODE"
+end)
+
+RpgBtn.MouseButton1Click:Connect(function()
+    _rpgMode = not _rpgMode; _killEnabled = false
+    RpgBtn.Text = _rpgMode and "RPG ON" or "RPG MODE"
+    RpgBtn.BackgroundColor3 = _rpgMode and Color3.fromRGB(255, 0, 0) or Color3.fromRGB(40, 40, 40)
+    KillBtn.BackgroundColor3 = Color3.fromRGB(80, 0, 0); KillBtn.Text = "START KILL"
+end)
+
+HomePage.Visible = true
