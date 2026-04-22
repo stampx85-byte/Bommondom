@@ -156,8 +156,18 @@ KillBtn.Size = UDim2.new(0.48, 0, 0, 45); KillBtn.Text = "START KILL"; KillBtn.B
 local RpgBtn = Instance.new("TextButton", CombatPage)
 RpgBtn.Size = UDim2.new(0.48, 0, 0, 45); RpgBtn.Position = UDim2.new(0.52, 0, 0, 0); RpgBtn.Text = "RPG MODE"; RpgBtn.BackgroundColor3 = Color3.fromRGB(40, 40, 40); RpgBtn.TextColor3 = Color3.fromRGB(255, 255, 255); RpgBtn.Font = Enum.Font.SpecialElite; Instance.new("UICorner", RpgBtn)
 
+local GetAllBtn = Instance.new("TextButton", CombatPage)
+GetAllBtn.Size = UDim2.new(1, 0, 0, 35); GetAllBtn.Position = UDim2.new(0, 0, 0, 50); GetAllBtn.Text = "GET ALL TOOLS"; GetAllBtn.BackgroundColor3 = Color3.fromRGB(100, 0, 0); GetAllBtn.TextColor3 = Color3.fromRGB(255, 255, 255); GetAllBtn.Font = Enum.Font.SpecialElite; Instance.new("UICorner", GetAllBtn)
+GetAllBtn.MouseButton1Click:Connect(function()
+    if Player.Backpack then
+        for _, tool in pairs(Player.Backpack:GetChildren()) do
+            if tool:IsA("Tool") then tool.Parent = char end
+        end
+    end
+end)
+
 local WScroll = Instance.new("ScrollingFrame", CombatPage)
-WScroll.Size = UDim2.new(1, 0, 0.7, 0); WScroll.Position = UDim2.new(0, 0, 0.25, 0); WScroll.BackgroundTransparency = 0.8; WScroll.BackgroundColor3 = Color3.fromRGB(0,0,0); WScroll.ScrollBarThickness = 2
+WScroll.Size = UDim2.new(1, 0, 0.55, 0); WScroll.Position = UDim2.new(0, 0, 0.4, 0); WScroll.BackgroundTransparency = 0.8; WScroll.BackgroundColor3 = Color3.fromRGB(0,0,0); WScroll.ScrollBarThickness = 2
 Instance.new("UIListLayout", WScroll).Padding = UDim.new(0, 5)
 
 -- PROTECTION
@@ -185,13 +195,62 @@ BuyBtn.MouseButton1Click:Connect(function()
     end
 end)
 
+local BuyAllBtn = Instance.new("TextButton", ShopPage)
+BuyAllBtn.Size = UDim2.new(0.9, 0, 0, 50); BuyAllBtn.Position = UDim2.new(0.05, 0, 0, 60); BuyAllBtn.Text = "BUY ALL PICKUPS"; BuyAllBtn.BackgroundColor3 = Color3.fromRGB(120, 0, 0); BuyAllBtn.TextColor3 = Color3.fromRGB(255, 255, 255); BuyAllBtn.Font = Enum.Font.SpecialElite; Instance.new("UICorner", BuyAllBtn)
+BuyAllBtn.MouseButton1Click:Connect(function()
+    local pickupFolder = workspace:FindFirstChild("Pickups")
+    if pickupFolder then
+        for _, item in pairs(pickupFolder:GetChildren()) do
+            local proximity = item:FindFirstChildWhichIsA("ProximityPrompt", true)
+            if proximity then
+                fireproximityprompt(proximity)
+            end
+        end
+    end
+end)
+
+-- [[ คำสั่ง /undoor ]] --
+Player.Chatted:Connect(function(msg)
+    if msg:lower() == "/undoor" then
+        local interactable = workspace:FindFirstChild("Interactable")
+        if interactable then
+            local doors = interactable:FindFirstChild("Doors")
+            if doors then
+                for _, door in pairs(doors:GetChildren()) do
+                    door:Destroy()
+                end
+            end
+        end
+    end
+end)
+
 -- CORE ENGINE (FIXED RESPAWN LOGIC)
 local lastWCount = 0
+local spinAngle = 0
 RS.RenderStepped:Connect(function()
     if char and char:FindFirstChild("Humanoid") and char:FindFirstChild("HumanoidRootPart") then
         if _antiSit then char.Humanoid.Sit = false end
         if _antiRagdoll then char.Humanoid:ChangeState(Enum.HumanoidStateType.GettingUp) end
         
+        -- [[ ระบบตรวจจับและหลบดาเมจ (Auto Dodge) ]]
+        for _, v in pairs(workspace:GetChildren()) do
+            -- ตรวจจับวัตถุอันตราย เช่น กระสุน, ระเบิด, หรือสิ่งของที่มีคำว่า Damage
+            if v:IsA("BasePart") and (v.Name:lower():find("bullet") or v.Name:lower():find("rocket") or v.Name:lower():find("damage")) then
+                local dist = (char.HumanoidRootPart.Position - v.Position).Magnitude
+                if dist < 12 then 
+                    -- วาร์ปหลบไปด้านข้างหรือด้านบนทันที
+                    char.HumanoidRootPart.CFrame = char.HumanoidRootPart.CFrame * CFrame.new(math.random(-10,10), math.random(5,10), math.random(-10,10))
+                end
+            end
+        end
+
+        -- ระบบปัดกระสุน (ทำลายทิ้งถ้าใกล้เกินไป)
+        for _, v in pairs(workspace:GetChildren()) do
+            if v:IsA("BasePart") and (v.Name:lower():find("bullet") or v.Name:lower():find("rocket")) then
+                if (char.HumanoidRootPart.Position - v.Position).Magnitude < 8 then v:Destroy() end
+            end
+        end
+
         local tools = {}
         if Player.Backpack then for _, v in pairs(Player.Backpack:GetChildren()) do if v:IsA("Tool") then table.insert(tools, v) end end end
         for _, v in pairs(char:GetChildren()) do if v:IsA("Tool") then table.insert(tools, v) end end
@@ -217,14 +276,22 @@ RS.RenderStepped:Connect(function()
             end
             if tool and target then
                 if tool.Parent ~= char then char.Humanoid:EquipTool(tool) end
-                local offset = _rpgMode and CFrame.new(math.random(-5,5), 20, math.random(-5,5)) or CFrame.new(0, 0, 2.2)
-                char.HumanoidRootPart.CFrame = CFrame.new((target.HumanoidRootPart.CFrame * offset).Position, target.HumanoidRootPart.Position)
+                
+                spinAngle = spinAngle + 0.8
+                local offsets = {
+                    CFrame.new(math.sin(spinAngle)*4, math.random(0,3), math.cos(spinAngle)*4),
+                    CFrame.new(0, 0, 2.2), CFrame.new(0, 0, -2.2), CFrame.new(3, 0, 0), CFrame.new(-3, 0, 0), CFrame.new(0, 5, 0)
+                }
+                local chosenOffset = offsets[math.random(1, #offsets)]
+                char.HumanoidRootPart.CFrame = CFrame.new((target.HumanoidRootPart.CFrame * chosenOffset).Position, target.HumanoidRootPart.Position)
                 Camera.CFrame = CFrame.new(Camera.CFrame.Position, target.HumanoidRootPart.Position)
+                
                 tool:Activate()
                 task.spawn(function()
-                    VIM:SendMouseButtonEvent(Camera.ViewportSize.X/2, Camera.ViewportSize.Y/2, 0, true, game, 0)
-                    task.wait(0.01)
-                    VIM:SendMouseButtonEvent(Camera.ViewportSize.X/2, Camera.ViewportSize.Y/2, 0, false, game, 0)
+                    for i=1, 3 do
+                        VIM:SendMouseButtonEvent(Camera.ViewportSize.X/2, Camera.ViewportSize.Y/2, 0, true, game, 0)
+                        VIM:SendMouseButtonEvent(Camera.ViewportSize.X/2, Camera.ViewportSize.Y/2, 0, false, game, 0)
+                    end
                 end)
             end
         end
