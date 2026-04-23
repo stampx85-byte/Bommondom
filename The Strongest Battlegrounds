@@ -1,0 +1,302 @@
+-- [[ SimpleSpy Official 💻 ]] --
+local Player = game.Players.LocalPlayer
+local RunService = game:GetService("RunService")
+local VirtualInput = game:GetService("VirtualInputManager")
+local Camera = workspace.CurrentCamera
+local TweenService = game:GetService("TweenService")
+
+-- CONFIG
+local TARGET_ANIM_ID = "10503381238"
+local Q_DASH_ID = "10479335397"
+local DASH_KEY = Enum.KeyCode.Q
+local LOCK_DURATION = 0.9 
+local SPIN_DELAY = 1 
+local LAST_SPIN = 0
+
+-- TOGGLES (Default OFF)
+local NORMAL_ENABLED = false
+local SPIN_ENABLED = false
+local TECH_SUB_ENABLED = false 
+local AIMBOT_ENABLED = false
+local TARGET_MODE = 1 
+
+-- ANIMATION IDs
+local SPIN_ANIM_IDS = {
+    ["13294471966"] = true, ["13532604085"] = true, ["13532600125"] = true,
+    ["13532562418"] = true, ["10469493270"] = true, ["10469630950"] = true,
+    ["10503381238"] = true
+}
+
+-- [[ UI SETUP ]] --
+if game.CoreGui:FindFirstChild("SimpleSpyOfficial") then game.CoreGui.SimpleSpyOfficial:Destroy() end
+local ScreenGui = Instance.new("ScreenGui", game.CoreGui)
+ScreenGui.Name = "SimpleSpyOfficial"
+
+-- Notification System
+local function Notify(text)
+    local msg = Instance.new("TextLabel", ScreenGui)
+    msg.Size = UDim2.new(0, 200, 0, 30)
+    msg.Position = UDim2.new(1, -210, 1, -40)
+    msg.BackgroundColor3 = Color3.fromRGB(15, 15, 15)
+    msg.TextColor3 = Color3.fromRGB(255, 255, 255)
+    msg.Text = text
+    msg.Font = Enum.Font.SpecialElite
+    msg.TextSize = 12
+    Instance.new("UIStroke", msg).Color = Color3.fromRGB(255, 0, 0)
+    Instance.new("UICorner", msg)
+    
+    task.delay(2, function()
+        TweenService:Create(msg, TweenInfo.new(0.5), {TextTransparency = 1, BackgroundTransparency = 1}):Play()
+        task.wait(0.5)
+        msg:Destroy()
+    end)
+end
+
+local MainFrame = Instance.new("Frame", ScreenGui)
+MainFrame.Size = UDim2.new(0, 200, 0, 280) 
+MainFrame.Position = UDim2.new(0.5, -100, 0.3, 0)
+MainFrame.BackgroundColor3 = Color3.fromRGB(5, 5, 5)
+MainFrame.Active = true
+MainFrame.Draggable = true
+Instance.new("UIStroke", MainFrame).Color = Color3.fromRGB(255, 0, 0)
+
+local MinimizedIcon = Instance.new("TextButton", ScreenGui)
+MinimizedIcon.Size = UDim2.new(0, 45, 0, 45)
+MinimizedIcon.Position = UDim2.new(0.5, -22, 0.05, 0)
+MinimizedIcon.BackgroundColor3 = Color3.fromRGB(5, 5, 5)
+MinimizedIcon.Text = "S"
+MinimizedIcon.TextSize = 25
+MinimizedIcon.TextColor3 = Color3.fromRGB(255, 0, 0)
+MinimizedIcon.Visible = false
+MinimizedIcon.Active = true
+MinimizedIcon.Draggable = true
+Instance.new("UICorner", MinimizedIcon).CornerRadius = UDim.new(1, 0)
+Instance.new("UIStroke", MinimizedIcon).Color = Color3.fromRGB(255, 0, 0)
+
+local Title = Instance.new("TextLabel", MainFrame)
+Title.Size = UDim2.new(1, -30, 0, 30)
+Title.Text = "SimpleSpy Official 💻"
+Title.TextColor3 = Color3.fromRGB(255, 0, 0)
+Title.BackgroundTransparency = 1
+Title.Font = Enum.Font.SpecialElite
+Title.TextSize = 14
+
+local MinBtn = Instance.new("TextButton", MainFrame)
+MinBtn.Size = UDim2.new(0, 30, 0, 30)
+MinBtn.Position = UDim2.new(1, -30, 0, 0)
+MinBtn.BackgroundTransparency = 1
+MinBtn.Text = "-"
+MinBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+MinBtn.TextSize = 20
+
+MinBtn.MouseButton1Click:Connect(function()
+    MainFrame.Visible = false
+    MinimizedIcon.Visible = true
+    MinimizedIcon.Position = MainFrame.Position
+end)
+
+MinimizedIcon.MouseButton1Click:Connect(function()
+    MainFrame.Visible = true
+    MinimizedIcon.Visible = false
+    MainFrame.Position = MinimizedIcon.Position
+end)
+
+-- [Target System]
+local function findGlobalTarget()
+    local Character = Player.Character
+    if not Character or not Character:FindFirstChild("HumanoidRootPart") then return nil end
+    local RootPart = Character.HumanoidRootPart
+    local closest, lastDist = nil, 80 
+    for _, obj in pairs(workspace:GetDescendants()) do
+        if obj:IsA("Humanoid") and obj.Parent ~= Character then
+            local isPlayer = game.Players:GetPlayerFromCharacter(obj.Parent)
+            local isDummy = not isPlayer
+            local canTarget = (TARGET_MODE == 1) or (TARGET_MODE == 2 and isPlayer) or (TARGET_MODE == 3 and isDummy)
+            if canTarget then
+                local targetRoot = obj.Parent:FindFirstChild("HumanoidRootPart")
+                if targetRoot then
+                    local dist = (RootPart.Position - targetRoot.Position).Magnitude
+                    if dist < lastDist then lastDist = dist closest = targetRoot end
+                end
+            end
+        end
+    end
+    return closest
+end
+
+-- [Main Logic for Respawn]
+local function ConnectCharacter(Character)
+    local Humanoid = Character:WaitForChild("Humanoid")
+    local RootPart = Character:WaitForChild("HumanoidRootPart")
+
+    Humanoid.AnimationPlayed:Connect(function(track)
+        local animId = track.Animation.AnimationId
+        if (animId:find(TARGET_ANIM_ID) or animId:find(Q_DASH_ID)) then
+            local target = findGlobalTarget()
+            task.wait(track.Length * 0.40)
+            if target and target.Parent then
+                if TECH_SUB_ENABLED then
+                    task.spawn(function() VirtualInput:SendKeyEvent(true, DASH_KEY, false, game) end)
+                    local startTime = tick()
+                    local connection
+                    connection = RunService.Heartbeat:Connect(function()
+                        local elapsed = tick() - startTime
+                        if target and target.Parent and elapsed < LOCK_DURATION then
+                            local tPos = target.Position
+                            if elapsed < 0.4 then
+                                local sideOffset = math.sin(elapsed * 40) * 7 
+                                RootPart.CFrame = CFrame.new(tPos + (target.CFrame.RightVector * sideOffset), tPos)
+                            else
+                                local camLook = Camera.CFrame.LookVector
+                                local warpPos = (camLook.Y < -0.3) and target.Position + (target.CFrame.LookVector * -2.5) or target.Position + (target.CFrame.LookVector * 1.5)
+                                RootPart.CFrame = CFrame.new(warpPos, Vector3.new(tPos.X, tPos.Y + 60, tPos.Z))
+                            end
+                        else
+                            VirtualInput:SendKeyEvent(false, DASH_KEY, false, game)
+                            connection:Disconnect()
+                        end
+                    end)
+                elseif NORMAL_ENABLED then
+                    task.spawn(function() VirtualInput:SendKeyEvent(true, DASH_KEY, false, game) end)
+                    local startTime = tick()
+                    local connection
+                    connection = RunService.Heartbeat:Connect(function()
+                        if target and target.Parent and (tick() - startTime) < LOCK_DURATION then
+                            RootPart.CFrame = CFrame.new(target.Position + (target.CFrame.LookVector * 1.2), Vector3.new(target.Position.X, target.Position.Y + 15, target.Position.Z))
+                        else
+                            VirtualInput:SendKeyEvent(false, DASH_KEY, false, game)
+                            connection:Disconnect()
+                        end
+                    end)
+                end
+            end
+        elseif (SPIN_ANIM_IDS[animId:sub(-11)] or SPIN_ANIM_IDS[animId]) and SPIN_ENABLED then
+            if tick() - LAST_SPIN < SPIN_DELAY then return end
+            LAST_SPIN = tick()
+            local target = findGlobalTarget()
+            if target and target.Parent then
+                VirtualInput:SendKeyEvent(true, Enum.KeyCode.A, false, game) 
+                task.spawn(function() VirtualInput:SendKeyEvent(true, DASH_KEY, false, game) end)
+                local startTime, angle = tick(), 0
+                local connection
+                connection = RunService.Heartbeat:Connect(function()
+                    if target and target.Parent and (tick() - startTime) < LOCK_DURATION then
+                        angle = angle + 0.8
+                        local offset = Vector3.new(math.cos(angle) * 6, 0, math.sin(angle) * 6)
+                        RootPart.CFrame = CFrame.new(target.Position + offset, target.Position)
+                    else
+                        VirtualInput:SendKeyEvent(false, DASH_KEY, false, game)
+                        VirtualInput:SendKeyEvent(false, Enum.KeyCode.A, false, game)
+                        connection:Disconnect()
+                    end
+                end)
+            end
+        end
+    end)
+end
+
+if Player.Character then ConnectCharacter(Player.Character) end
+Player.CharacterAdded:Connect(ConnectCharacter)
+
+RunService.RenderStepped:Connect(function()
+    if AIMBOT_ENABLED and Player.Character and Player.Character:FindFirstChild("HumanoidRootPart") then
+        local target = findGlobalTarget()
+        if target then
+            local RootPart = Player.Character.HumanoidRootPart
+            RootPart.CFrame = CFrame.lookAt(RootPart.Position, Vector3.new(target.Position.X, RootPart.Position.Y, target.Position.Z))
+        end
+    end
+end)
+
+-- [Button Creation]
+local function createBtn(name, pos)
+    local btn = Instance.new("TextButton", MainFrame)
+    btn.Size = UDim2.new(0.9, 0, 0, 32)
+    btn.Position = pos
+    btn.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
+    btn.TextColor3 = Color3.fromRGB(255, 255, 255)
+    btn.Font = Enum.Font.SpecialElite
+    btn.TextSize = 10
+    btn.Text = name
+    Instance.new("UICorner", btn)
+    return btn
+end
+
+local b1 = createBtn("Normal Lock: OFF", UDim2.new(0.05, 0, 0.12, 0))
+b1.MouseButton1Click:Connect(function() 
+    NORMAL_ENABLED = not NORMAL_ENABLED 
+    b1.Text = "Normal Lock: " .. (NORMAL_ENABLED and "ON" or "OFF") 
+    b1.BackgroundColor3 = NORMAL_ENABLED and Color3.fromRGB(150, 0, 0) or Color3.fromRGB(40, 40, 40)
+    Notify("Normal Lock: " .. (NORMAL_ENABLED and "Enabled" or "Disabled"))
+end)
+
+local b2 = createBtn("Spin Dash: OFF", UDim2.new(0.05, 0, 0.26, 0))
+b2.MouseButton1Click:Connect(function() 
+    SPIN_ENABLED = not SPIN_ENABLED 
+    b2.Text = "Spin Dash: " .. (SPIN_ENABLED and "ON" or "OFF") 
+    b2.BackgroundColor3 = SPIN_ENABLED and Color3.fromRGB(150, 0, 0) or Color3.fromRGB(40, 40, 40)
+    Notify("Spin Dash: " .. (SPIN_ENABLED and "Enabled" or "Disabled"))
+end)
+
+local b3 = createBtn("Tech SubBody: OFF", UDim2.new(0.05, 0, 0.40, 0))
+b3.MouseButton1Click:Connect(function() 
+    TECH_SUB_ENABLED = not TECH_SUB_ENABLED 
+    b3.Text = "Tech SubBody: " .. (TECH_SUB_ENABLED and "ON" or "OFF") 
+    b3.BackgroundColor3 = TECH_SUB_ENABLED and Color3.fromRGB(150, 0, 0) or Color3.fromRGB(40, 40, 40)
+    Notify("Tech SubBody: " .. (TECH_SUB_ENABLED and "Enabled" or "Disabled"))
+end)
+
+local b4 = createBtn("Aimbot: OFF", UDim2.new(0.05, 0, 0.54, 0))
+b4.MouseButton1Click:Connect(function() 
+    AIMBOT_ENABLED = not AIMBOT_ENABLED 
+    b4.Text = "Aimbot: " .. (AIMBOT_ENABLED and "ON" or "OFF") 
+    b4.BackgroundColor3 = AIMBOT_ENABLED and Color3.fromRGB(150, 0, 0) or Color3.fromRGB(40, 40, 40)
+    Notify("Aimbot: " .. (AIMBOT_ENABLED and "Enabled" or "Disabled"))
+end)
+
+local b5 = createBtn("Target: ALL", UDim2.new(0.05, 0, 0.68, 0))
+b5.MouseButton1Click:Connect(function()
+    TARGET_MODE = TARGET_MODE + 1
+    if TARGET_MODE > 3 then TARGET_MODE = 1 end
+    local modes = {"ALL", "PLAYER ONLY", "DUMMY ONLY"}
+    b5.Text = "Target: " .. modes[TARGET_MODE]
+    Notify("Target Mode: " .. modes[TARGET_MODE])
+end)
+
+-- [[ FPS BOOST BUTTON - FORCE DELETE ]] --
+local b6 = createBtn("FPS BOOST (Clean Now)", UDim2.new(0.05, 0, 0.82, 0))
+b6.BackgroundColor3 = Color3.fromRGB(0, 100, 0)
+b6.MouseButton1Click:Connect(function()
+    local count = 0
+    
+    -- ลบใน Thrown (ใช้ Recursive กวาดทั้งหมด)
+    local function CleanThrown()
+        local folder = workspace:FindFirstChild("Thrown", true) -- ค้นหาแบบทั่วถึง
+        if folder then
+            for _, v in pairs(folder:GetDescendants()) do
+                if v.Name == "Debris" or v.Name == "SmallDebris" or v.Name == "Part" or v:IsA("Part") then
+                    pcall(function() v:Destroy() end)
+                    count = count + 1
+                end
+            end
+        end
+    end
+
+    -- ลบใน Trees (ลบโมเดลทั้งหมด)
+    local function CleanTrees()
+        local folder = workspace:FindFirstChild("Trees", true)
+        if folder then
+            for _, v in pairs(folder:GetChildren()) do
+                if v:IsA("Model") or v.Name == "Tree" then
+                    pcall(function() v:Destroy() end)
+                    count = count + 1
+                end
+            end
+        end
+    end
+
+    CleanThrown()
+    CleanTrees()
+    
+    Notify("FPS Boost: Force Removed " .. tostring(count) .. " objects")
+end)
