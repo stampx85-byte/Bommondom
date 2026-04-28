@@ -6,7 +6,7 @@ local VirtualInputManager = game:GetService("VirtualInputManager")
 local MobFolder = game.Workspace:FindFirstChild("Mob")
 local DunMobFolder = game.Workspace:FindFirstChild("DunMob")
 local NPCFolder = game.Workspace:FindFirstChild("npcClick")
-local IslandFolder = game.Workspace:FindFirstChild("Island") -- โฟลเดอร์เกาะ
+local IslandFolder = game.Workspace:FindFirstChild("Island")
 
 local _G = {
     AutoFarm = false,
@@ -17,7 +17,9 @@ local _G = {
     FarmType = "None",
     DunFarmType = "None",
     DistanceAbove = 7, 
-    SelectedWeapon = nil
+    SelectedWeapon = nil,
+    AutoBoneSatoru = false,
+    AutoGreenCells = false
 }
 
 local HitOnce = {}
@@ -109,13 +111,6 @@ task.spawn(function()
                             if not HitOnce[v] then targetMob = v break end
                         end
                     end
-                    if not targetMob then
-                        for _, v in pairs(currentFolder:GetChildren()) do
-                            if v.Name == currentType and v:FindFirstChild("Humanoid") and v.Humanoid.Health > 0 then
-                                targetMob = v break
-                            end
-                        end
-                    end
                 end
 
                 if targetMob and targetMob:FindFirstChild("HumanoidRootPart") then
@@ -130,7 +125,44 @@ task.spawn(function()
     end
 end)
 
--- ระบบ Auto Attack & Multi-Skill
+-- ระบบ Auto Click Items (ปรับปรุง: วาร์ปสูง, รอตก, ล็อคตัว, กดรัว)
+task.spawn(function()
+    while task.wait() do
+        if _G.AutoBoneSatoru or _G.AutoGreenCells then
+            pcall(function()
+                local char = game.Players.LocalPlayer.Character
+                local hrp = char:FindFirstChild("HumanoidRootPart")
+                local hum = char:FindFirstChild("Humanoid")
+                local targetClickPos = _G.AutoBoneSatoru and Vector3.new(1415.49146, 12.8422089, 1080.62158) or Vector3.new(-159.092834, 9.08454895, -27.5221729)
+                
+                -- ตรวจสอบว่าถึงพื้นหรือยัง ถ้าถึงแล้วให้ Lock ตัว
+                if hum.FloorMaterial ~= Enum.Material.Air then
+                    hrp.Anchored = true
+                    -- ลูปกดรัว
+                    for _, v in pairs(game.Workspace:GetDescendants()) do
+                        if v:IsA("ClickDetector") and (v.Parent:IsA("BasePart") or v.Parent:IsA("Model")) then
+                            if (v.Parent:GetPivot().Position - targetClickPos).Magnitude < 15 then
+                                fireclickdetector(v)
+                            end
+                        end
+                    end
+                else
+                    hrp.Anchored = false
+                end
+            end)
+        else
+            -- ปลดล็อคเมื่อปิด
+            pcall(function()
+                if game.Players.LocalPlayer.Character:FindFirstChild("HumanoidRootPart") then
+                    game.Players.LocalPlayer.Character.HumanoidRootPart.Anchored = false
+                end
+            end)
+        end
+        task.wait(0.01)
+    end
+end)
+
+-- ระบบ Auto Attack & Skill
 task.spawn(function()
     while task.wait(0.2) do
         if (_G.AutoFarm or _G.AutoDunFarm or _G.AutoFarmArea) and _G.SelectedWeapon then
@@ -147,17 +179,11 @@ task.spawn(function()
                             local animFound = false
                             local checkTime = 0
                             while checkTime < 0.2 do
-                                if #char.Humanoid:GetPlayingAnimationTracks() > 0 then
-                                    animFound = true
-                                    break
-                                end
+                                if #char.Humanoid:GetPlayingAnimationTracks() > 0 then animFound = true break end
                                 task.wait(0.01)
                                 checkTime = checkTime + 0.01
                             end
                             VirtualInputManager:SendKeyEvent(false, Enum.KeyCode[skill], false, game)
-                            if animFound then
-                                Notification.new({Title = "Skill Executed", Description = "ใช้สกิล: " .. skill, Duration = 1, Icon = "rbxassetid://7733954785"})
-                            end
                         end
                     end
                 end
@@ -179,6 +205,22 @@ local FarmTab = Windows:NewTab({Title = "Auto Farm", Icon = "rbxassetid://773396
 local AreaSection = FarmTab:NewSection({Title = "Nearest Area Farm", Position = "Left"})
 AreaSection:NewToggle({Title = "Auto Farm Nearest", Callback = function(state) _G.AutoFarmArea = state if state then _G.AutoFarm = false _G.AutoDunFarm = false end HitOnce = {} end})
 
+local ItemSection = FarmTab:NewSection({Title = "Special Item Farm (Lock & Fast)", Position = "Left"})
+ItemSection:NewToggle({Title = "ออโต้ Bone Satoru", Callback = function(state) 
+    _G.AutoBoneSatoru = state 
+    if state then
+        -- วาร์ปครั้งเดียวไปบนฟ้าเหนือพิกัด
+        game.Players.LocalPlayer.Character.HumanoidRootPart.CFrame = CFrame.new(1415.49146, 12.8422089 + 50, 1080.62158)
+    end
+end})
+ItemSection:NewToggle({Title = "ออโต้ Green Cells", Callback = function(state) 
+    _G.AutoGreenCells = state 
+    if state then
+        -- วาร์ปครั้งเดียวไปบนฟ้าเหนือพิกัด
+        game.Players.LocalPlayer.Character.HumanoidRootPart.CFrame = CFrame.new(-159.092834, 9.08454895 + 50, -27.5221729)
+    end
+end})
+
 local FarmSection = FarmTab:NewSection({Title = "Normal Mob Farm", Position = "Left"})
 FarmSection:NewToggle({Title = "Auto Farm Mob", Callback = function(state) _G.AutoFarm = state _G.AutoDunFarm = false _G.AutoFarmArea = false HitOnce = {} end})
 local MobDropdown = FarmSection:NewDropdown({Title = "Select Mob", Data = getMobList(), Callback = function(val) _G.FarmType = val HitOnce = {} end})
@@ -197,41 +239,12 @@ local WeaponSection = FarmTab:NewSection({Title = "Weapon", Position = "Right"})
 local WeaponDropdown = WeaponSection:NewDropdown({Title = "Select Weapon", Data = getInventory(), Callback = function(val) _G.SelectedWeapon = val end})
 WeaponSection:NewButton({Title = "Refresh Weapons", Callback = function() WeaponDropdown:Refresh(getInventory()) end})
 
--- Tab: Teleport (NPC & Islands)
+-- Tab: Teleport
 local TeleportTab = Windows:NewTab({Title = "Teleport", Icon = "rbxassetid://7733954785"})
-
--- ส่วนของ NPC เดิม
 local NPCSection = TeleportTab:NewSection({Title = "NPC Locations", Position = "Left"})
-local NPCDropdown = NPCSection:NewDropdown({
-    Title = "Select NPC",
-    Data = getNPCList(),
-    Callback = function(val)
-        pcall(function()
-            local npc = NPCFolder:FindFirstChild(val)
-            if npc then 
-                local pos = npc:IsA("Model") and npc:GetModelCFrame() or npc.CFrame
-                game.Players.LocalPlayer.Character.HumanoidRootPart.CFrame = pos 
-            end
-        end)
-    end
-})
+local NPCDropdown = NPCSection:NewDropdown({Title = "Select NPC", Data = getNPCList(), Callback = function(val) pcall(function() local npc = NPCFolder:FindFirstChild(val) if npc then game.Players.LocalPlayer.Character.HumanoidRootPart.CFrame = npc:IsA("Model") and npc:GetModelCFrame() or npc.CFrame end end) end})
 NPCSection:NewButton({Title = "Refresh NPC", Callback = function() NPCDropdown:Refresh(getNPCList()) end})
 
--- ส่วนของ Island ที่เพิ่มใหม่ (วาร์ปไปบนฟ้าแล้วตกลงมา)
 local IslandSection = TeleportTab:NewSection({Title = "Island Locations", Position = "Right"})
-local IslandDropdown = IslandSection:NewDropdown({
-    Title = "Select Island",
-    Data = getIslandList(),
-    Callback = function(val)
-        pcall(function()
-            local island = IslandFolder:FindFirstChild(val)
-            if island then
-                local pos = island:IsA("Model") and island:GetModelCFrame().Position or island.Position
-                -- วาร์ปไปที่พิกัดเกาะ แต่บวกความสูงขึ้นไป 500 หน่วย เพื่อให้ตกลงมา
-                game.Players.LocalPlayer.Character.HumanoidRootPart.CFrame = CFrame.new(pos + Vector3.new(0, 500, 0))
-                Notification.new({Title = "Island Warp", Description = "กำลังเดินทางไปเกาะ " .. val .. " (จากฟ้า)", Duration = 3})
-            end
-        end)
-    end
-})
+local IslandDropdown = IslandSection:NewDropdown({Title = "Select Island", Data = getIslandList(), Callback = function(val) pcall(function() local island = IslandFolder:FindFirstChild(val) if island then local pos = island:IsA("Model") and island:GetModelCFrame().Position or island.Position game.Players.LocalPlayer.Character.HumanoidRootPart.CFrame = CFrame.new(pos + Vector3.new(0, 500, 0)) end end) end})
 IslandSection:NewButton({Title = "Refresh Island", Callback = function() IslandDropdown:Refresh(getIslandList()) end})
