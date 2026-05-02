@@ -1,0 +1,262 @@
+local WindUI = loadstring(game:HttpGet("https://github.com/Footagesus/WindUI/releases/latest/download/main.lua"))()
+
+-- // [ ธีม Hacker Neon Red ] // --
+WindUI:AddTheme({
+    Name = "SimpleSpyRed",
+    Accent = Color3.fromHex("#FF0000"),
+    Background = Color3.fromHex("#0A0A0A"),
+    Outline = Color3.fromHex("#1A1A1A"),
+    Text = Color3.fromHex("#FFFFFF"),
+    Placeholder = Color3.fromHex("#7a7a7a"),
+    Button = Color3.fromHex("#1F1F1F"),
+    Icon = Color3.fromHex("#FF0000"),
+})
+WindUI:SetTheme("SimpleSpyRed")
+
+-- // [ ระบบความปลอดภัยและตัวแปร ] // --
+local plr = game:GetService("Players").LocalPlayer
+local mouse = plr:GetMouse()
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local RunService = game:GetService("RunService")
+local CoreGui = game:GetService("CoreGui")
+local toolStorage = ReplicatedStorage:WaitForChild("ToolStorage", 10):WaitForChild("ToolsStorage", 10)
+local HouseRemote = ReplicatedStorage:WaitForChild("House", 10)
+
+local _G = {
+    autoSellEnabled = false,
+    killAuraEnabled = false,
+    killAllEnabled = false,
+    antiWarpEnabled = false,
+    autoBuyLoop = false,
+    noclipSwimRing = false,
+    antiCrashEnabled = false,
+    targetLockEnabled = false,
+    lockedTarget = nil,
+    lastValidPos = nil,
+    gunVendorPos = Vector3.new(-76.84, 162.67, 231.24),
+    walkSpeedEnabled = false,
+    jumpPowerEnabled = false,
+    wsValue = 16,
+    jpValue = 50
+}
+
+--// --- [ METATABLE SYSTEM - PC UPGRADED ] --- //--
+local mt = getrawmetatable(game)
+local oldNamecall = mt.__namecall
+local set_readonly = setreadonly or make_readonly
+local set_writeable = setwriteable or make_writeable
+
+if set_writeable then set_writeable(mt, false) end
+mt.__namecall = newcclosure(function(self, ...)
+    local method = getnamecallmethod()
+    local args = {...}
+    if method == "Kick" or method == "kick" then return nil end
+    if method == "FireServer" and self.Name == "MainEvent" then
+        if args[1] == "TeleportDetect" or args[1] == "WalkSpeed" then return nil end
+    end
+    return oldNamecall(self, unpack(args))
+end)
+if set_readonly then set_readonly(mt, true) end
+
+--// --- [ SYSTEM FUNCTIONS ] --- //--
+local function applyAntiCrash(p)
+    if not _G.antiCrashEnabled then return end
+    local plrgui = p:WaitForChild("PlayerGui")
+    local function cleanGui(gui)
+        if _G.antiCrashEnabled and gui.Name == "Announcement" then gui:Destroy() end
+    end
+    for _, g in ipairs(plrgui:GetChildren()) do cleanGui(g) end
+    plrgui.ChildAdded:Connect(cleanGui)
+end
+
+local function stashAllGuns()
+    for _, item in ipairs(plr.Backpack:GetChildren()) do
+        if item.Name == "Gun" then task.wait(0.05); toolStorage:FireServer("Save", "Gun") end
+    end
+    if plr.Character then
+        for _, item in ipairs(plr.Character:GetChildren()) do
+            if item.Name == "Gun" then item.Parent = plr.Backpack; task.wait(0.05); toolStorage:FireServer("Save", "Gun") end
+        end
+    end
+end
+
+local function pullAllGuns()
+    for i = 1, 10 do toolStorage:FireServer("Get", "Gun") end
+end
+
+local function fireGunAt(targetPart)
+    if not targetPart or not plr.Character then return end
+    local hum = plr.Character:FindFirstChildOfClass("Humanoid")
+    local root = plr.Character:FindFirstChild("HumanoidRootPart")
+    if not hum or not root then return end
+    local guns = {}
+    for _, item in ipairs(plr.Backpack:GetChildren()) do
+        if item.Name == "Gun" and item:FindFirstChild("shot") then table.insert(guns, item) end
+    end
+    if #guns == 0 then return end
+    local ping = game:GetService("Stats").Network.ServerStatsItem["Data Ping"]:GetValue() / 1000
+    local aimPos = targetPart.Position + (targetPart.Velocity * (0.15 + (ping * 0.5)))
+    for _, gun in ipairs(guns) do
+        if not (_G.killAllEnabled or _G.killAuraEnabled or _G.targetLockEnabled) then break end
+        hum:EquipTool(gun)
+        gun.Grip = CFrame.new((aimPos + Vector3.new(math.cos(tick()*12)*3, 0, 0)) - root.Position)
+        task.spawn(function() for i=1,3 do gun.shot:FireServer(aimPos) end end)
+    end
+end
+
+-- // [ สร้างหน้าต่าง UI ] // --
+local Window = WindUI:CreateWindow({
+    Title = "SimpleSpy Official 💻",
+    Icon = "terminal",
+    Author = "by ffsww_1007",
+    Folder = "SimpleSpyConfig",
+    Size = UDim2.fromOffset(450, 400),
+    Transparent = true,
+})
+
+-- // [ สร้าง Target Label (สำหรับคลิกล็อค) ] // --
+local TargetLabel = Instance.new("TextLabel")
+TargetLabel.Size = UDim2.new(0, 200, 0, 30)
+TargetLabel.Position = UDim2.new(0.5, -100, 0, 50)
+TargetLabel.BackgroundColor3 = Color3.fromRGB(0, 0, 0)
+TargetLabel.BackgroundTransparency = 0.5
+TargetLabel.TextColor3 = Color3.fromRGB(255, 0, 0)
+TargetLabel.Text = "Target: None"
+TargetLabel.Font = Enum.Font.SpecialElite
+TargetLabel.TextSize = 14
+TargetLabel.Visible = false
+local success, _ = pcall(function() TargetLabel.Parent = CoreGui end)
+if not success then TargetLabel.Parent = plr:WaitForChild("PlayerGui") end
+Instance.new("UICorner", TargetLabel)
+
+-- ระบบคลิกล็อคตัวละคร
+mouse.Button1Down:Connect(function()
+    if _G.targetLockEnabled and mouse.Target then
+        local model = mouse.Target:FindFirstAncestorOfClass("Model")
+        if model and game.Players:GetPlayerFromCharacter(model) then
+            local targetPlayer = game.Players:GetPlayerFromCharacter(model)
+            if targetPlayer ~= plr then
+                _G.lockedTarget = targetPlayer
+                TargetLabel.Text = "Target: " .. targetPlayer.Name
+                TargetLabel.Visible = true
+                task.delay(3, function() TargetLabel.Visible = false end)
+            end
+        end
+    end
+end)
+
+-- // [ TAB 1: COMBAT ] // --
+local CombatTab = Window:Tab({ Title = "Combat", Icon = "zap" })
+
+CombatTab:Section({ Title = "Elite Combat" })
+CombatTab:Toggle({
+    Title = "KILL AURA (ELITE)",
+    Callback = function(s)
+        _G.killAuraEnabled = s
+        task.spawn(function()
+            while _G.killAuraEnabled do
+                for _, enemy in ipairs(game.Players:GetPlayers()) do
+                    if enemy ~= plr and enemy.Character and enemy.Character:FindFirstChild("Humanoid") then
+                        if enemy.Character.Humanoid.Health > 0 and (plr.Character.HumanoidRootPart.Position - enemy.Character.HumanoidRootPart.Position).Magnitude <= 140 then
+                            fireGunAt(enemy.Character.HumanoidRootPart)
+                        end
+                    end
+                end
+                task.wait(0.01)
+            end
+        end)
+    end
+})
+
+CombatTab:Toggle({
+    Title = "TARGET LOCK (CLICK)",
+    Callback = function(s)
+        _G.targetLockEnabled = s
+        if not s then _G.lockedTarget = nil end
+        task.spawn(function()
+            while _G.targetLockEnabled do
+                if _G.lockedTarget and _G.lockedTarget.Character and _G.lockedTarget.Character:FindFirstChild("HumanoidRootPart") then
+                    if _G.lockedTarget.Character.Humanoid.Health > 0 then fireGunAt(_G.lockedTarget.Character.HumanoidRootPart) end
+                end
+                task.wait(0.01)
+            end
+        end)
+    end
+})
+
+CombatTab:Toggle({
+    Title = "KILL ALL (EXTREME)",
+    Callback = function(s)
+        _G.killAllEnabled = s
+        task.spawn(function()
+            while _G.killAllEnabled do
+                for _, enemy in ipairs(game.Players:GetPlayers()) do
+                    if enemy ~= plr and enemy.Character and enemy.Character:FindFirstChild("Humanoid") then
+                        if enemy.Character.Humanoid.Health > 0 then fireGunAt(enemy.Character.HumanoidRootPart) end
+                    end
+                end
+                task.wait(0.01)
+            end
+        end)
+    end
+})
+
+CombatTab:Section({ Title = "Gun Management" })
+CombatTab:Button({ Title = "GET ALL GUNS", Callback = pullAllGuns })
+CombatTab:Button({ Title = "STASH ALL GUNS", Callback = stashAllGuns })
+
+-- // [ TAB 2: FARM ] // --
+local FarmTab = Window:Tab({ Title = "Farm", Icon = "swords" })
+FarmTab:Toggle({
+    Title = "AUTO SELL x500",
+    Callback = function(s)
+        _G.autoSellEnabled = s
+        task.spawn(function()
+            while _G.autoSellEnabled do
+                for i = 1, 10 do task.defer(function() for i = 1, 500 do HouseRemote:FireServer("Sell") end end) end
+                RunService.Heartbeat:Wait()
+            end
+        end)
+    end
+})
+FarmTab:Toggle({ Title = "AUTO BUY LOOP (GUN)", Callback = function(s) _G.autoBuyLoop = s task.spawn(function() while _G.autoBuyLoop do pullAllGuns() task.wait(1.2) end end) end })
+
+-- // [ TAB 3: MISC ] // --
+local MiscTab = Window:Tab({ Title = "Misc", Icon = "settings" })
+MiscTab:Toggle({ Title = "ANTI-WARP/CLAIM", Callback = function(s) _G.antiWarpEnabled = s end })
+MiscTab:Toggle({ Title = "ANTI-CRASH", Callback = function(s) _G.antiCrashEnabled = s if s then applyAntiCrash(plr) end end })
+MiscTab:Toggle({ Title = "SWIMRING NOCLIP", Callback = function(s) _G.noclipSwimRing = s end })
+
+-- // [ TAB 4: MOVEMENT ] // --
+local MoveTab = Window:Tab({ Title = "Movement", Icon = "move" })
+MoveTab:Toggle({ Title = "SPEED WARP", Callback = function(s) _G.walkSpeedEnabled = s end })
+MoveTab:Input({ Title = "SPEED VALUE", Placeholder = "16", Callback = function(t) _G.wsValue = tonumber(t) or 16 end })
+MoveTab:Toggle({ Title = "HIGH JUMP", Callback = function(s) _G.jumpPowerEnabled = s end })
+MoveTab:Input({ Title = "JUMP VALUE", Placeholder = "50", Callback = function(t) _G.jpValue = tonumber(t) or 50 end })
+
+-- // [ BACKEND LOOPS ] // --
+RunService.Heartbeat:Connect(function()
+    local char = plr.Character
+    if not char then return end
+    local hum = char:FindFirstChildOfClass("Humanoid")
+    if hum then
+        hum.WalkSpeed = _G.walkSpeedEnabled and _G.wsValue or 16
+        if _G.jumpPowerEnabled then hum.JumpPower = _G.jpValue; hum.UseJumpPower = true else hum.JumpPower = 50 end
+    end
+    local hrp = char:FindFirstChild("HumanoidRootPart")
+    if _G.antiWarpEnabled and hrp and hum.Health > 0 then
+        if _G.lastValidPos and (hrp.Position - _G.lastValidPos.Position).Magnitude > 25 then
+            hrp.CFrame = _G.lastValidPos
+            hrp.Velocity = Vector3.zero
+            local gi = ReplicatedStorage:FindFirstChild("GetItemBack")
+            if gi then gi:FireServer() end
+        else _G.lastValidPos = hrp.CFrame end
+    end
+    if _G.noclipSwimRing then
+        for _, v in ipairs(workspace:GetDescendants()) do if v.Name == "SwimRingPart2" and v:IsA("BasePart") then v.CanCollide = false end end
+    end
+end)
+
+plr.CharacterAdded:Connect(function() if _G.antiCrashEnabled then applyAntiCrash(plr) end end)
+
+WindUI:Notify({ Title = "SimpleSpy Official", Content = "Target Lock & PC Optimized Ready!", Duration = 5, Icon = "check" })
