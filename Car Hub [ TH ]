@@ -1,0 +1,172 @@
+-- [[ CAR HUB UI WITH MINIMIZE SYSTEM by Gemini [TH] ]] --
+local Player = game.Players.LocalPlayer
+local UserInputService = game:GetService("UserInputService")
+
+-- ลบ UI เก่าทิ้งก่อนรันใหม่
+if game.CoreGui:FindFirstChild("CarHubUI") then
+    game.CoreGui.CarHubUI:Destroy()
+end
+
+local ScreenGui = Instance.new("ScreenGui")
+local MainFrame = Instance.new("Frame")
+local Title = Instance.new("TextLabel")
+local WarningLabel = Instance.new("TextLabel")
+local ScrollingFrame = Instance.new("ScrollingFrame")
+local UIListLayout = Instance.new("UIListLayout")
+local MinimizeBtn = Instance.new("TextButton") -- ปุ่มย่อ
+local OpenIcon = Instance.new("TextButton") -- ไอคอนตอนย่อ
+
+ScreenGui.Name = "CarHubUI"
+ScreenGui.Parent = game.CoreGui
+ScreenGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
+
+-- Main Frame Setup
+MainFrame.Name = "MainFrame"
+MainFrame.Parent = ScreenGui
+MainFrame.Size = UDim2.new(0, 220, 0, 280)
+MainFrame.Position = UDim2.new(0.5, -110, 0.5, -140)
+MainFrame.BackgroundColor3 = Color3.fromRGB(20, 0, 0)
+MainFrame.BorderSizePixel = 0
+MainFrame.Active = true
+MainFrame.Visible = true
+
+local UICorner = Instance.new("UICorner")
+UICorner.Parent = MainFrame
+
+-- [[ ไอคอนตอนย่อ (ลากได้) ]] --
+OpenIcon.Name = "OpenIcon"
+OpenIcon.Parent = ScreenGui
+OpenIcon.Size = UDim2.new(0, 50, 0, 50)
+OpenIcon.Position = UDim2.new(0, 10, 0.5, 0)
+OpenIcon.BackgroundColor3 = Color3.fromRGB(60, 0, 0)
+OpenIcon.Text = "CAR"
+OpenIcon.TextColor3 = Color3.fromRGB(255, 255, 255)
+OpenIcon.Font = Enum.Font.SpecialElite
+OpenIcon.TextSize = 14
+OpenIcon.Visible = false
+local IconCorner = Instance.new("UICorner")
+IconCorner.CornerRadius = ToolPoint.new(1, 0) -- ทำให้กลม
+IconCorner.Parent = OpenIcon
+
+-- [[ ระบบลาก UI (ใช้ได้ทั้ง MainFrame และ OpenIcon) ]] --
+local function MakeDraggable(obj)
+    local dragging, dragInput, dragStart, startPos
+    obj.InputBegan:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+            dragging = true
+            dragStart = input.Position
+            startPos = obj.Position
+            input.Changed:Connect(function()
+                if input.UserInputState == Enum.UserInputState.End then dragging = false end
+            end)
+        end
+    end)
+    obj.InputChanged:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch then
+            dragInput = input
+        end
+    end)
+    UserInputService.InputChanged:Connect(function(input)
+        if input == dragInput and dragging then
+            local delta = input.Position - dragStart
+            obj.Position = UDim2.new(startPos.X.Scale, startPos.X.Offset + delta.X, startPos.Y.Scale, startPos.Y.Offset + delta.Y)
+        end
+    end)
+end
+
+MakeDraggable(MainFrame)
+MakeDraggable(OpenIcon)
+
+-- ปุ่มย่อ (Minimize)
+MinimizeBtn.Parent = MainFrame
+MinimizeBtn.Size = UDim2.new(0, 30, 0, 30)
+MinimizeBtn.Position = UDim2.new(1, -35, 0, 5)
+MinimizeBtn.BackgroundColor3 = Color3.fromRGB(40, 0, 0)
+MinimizeBtn.Text = "_"
+MinimizeBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+MinimizeBtn.Font = Enum.Font.SpecialElite
+MinimizeBtn.TextSize = 20
+Instance.new("UICorner", MinimizeBtn)
+
+MinimizeBtn.MouseButton1Click:Connect(function()
+    MainFrame.Visible = false
+    OpenIcon.Visible = true
+end)
+
+OpenIcon.MouseButton1Click:Connect(function()
+    OpenIcon.Visible = false
+    MainFrame.Visible = true
+end)
+
+-- หัวข้อ
+Title.Parent = MainFrame
+Title.Size = UDim2.new(1, -40, 0, 35)
+Title.Position = UDim2.new(0, 5, 0, 0)
+Title.Text = "CAR HUB [TH]"
+Title.TextColor3 = Color3.fromRGB(255, 255, 255)
+Title.Font = Enum.Font.SpecialElite
+Title.TextSize = 18
+Title.BackgroundTransparency = 1
+Title.TextXAlignment = Enum.TextXAlignment.Left
+
+-- คำเตือน
+WarningLabel.Parent = MainFrame
+WarningLabel.Size = UDim2.new(0.9, 0, 0, 40)
+WarningLabel.Position = UDim2.new(0.05, 0, 0.12, 0)
+WarningLabel.Text = "เมื่อรันแล้วจะไม่สามารถลบท่าทางได้\nต้องออกเข้าใหม่เท่านั้น"
+WarningLabel.TextColor3 = Color3.fromRGB(255, 100, 100)
+WarningLabel.Font = Enum.Font.SourceSansBold
+WarningLabel.TextSize = 11
+WarningLabel.BackgroundTransparency = 1
+
+-- ที่ใส่ปุ่ม (Scrolling)
+ScrollingFrame.Parent = MainFrame
+ScrollingFrame.Size = UDim2.new(0.9, 0, 0.65, 0)
+ScrollingFrame.Position = UDim2.new(0.05, 0, 0.28, 0)
+ScrollingFrame.BackgroundTransparency = 1
+ScrollingFrame.CanvasSize = UDim2.new(0, 0, 1.2, 0)
+ScrollingFrame.ScrollBarThickness = 2
+
+UIListLayout.Parent = ScrollingFrame
+UIListLayout.SortOrder = Enum.SortOrder.LayoutOrder
+UIListLayout.Padding = UDim.new(0, 8)
+
+-- ฟังก์ชันสร้างปุ่มรันสคริปต์
+local function CreateCarButton(name, loadstring_code)
+    local Btn = Instance.new("TextButton")
+    Btn.Parent = ScrollingFrame
+    Btn.Size = UDim2.new(1, 0, 0, 35)
+    Btn.BackgroundColor3 = Color3.fromRGB(60, 0, 0)
+    Btn.Text = "RUN: " .. name
+    Btn.TextColor3 = Color3.fromRGB(255, 255, 255)
+    Btn.Font = Enum.Font.SpecialElite
+    Btn.TextSize = 14
+    Instance.new("UICorner", Btn)
+
+    local confirmMode = false
+    Btn.MouseButton1Click:Connect(function()
+        if not confirmMode then
+            confirmMode = true
+            Btn.Text = "CONFIRM?"
+            Btn.BackgroundColor3 = Color3.fromRGB(150, 0, 0)
+            task.wait(2)
+            confirmMode = false
+            Btn.Text = "RUN: " .. name
+            Btn.BackgroundColor3 = Color3.fromRGB(60, 0, 0)
+        else
+            Btn.Text = "EXECUTING..."
+            loadstring(game:HttpGet(loadstring_code))()
+            task.wait(0.5)
+            Btn.Text = "RUN: " .. name
+            Btn.BackgroundColor3 = Color3.fromRGB(60, 0, 0)
+            confirmMode = false
+        end
+    end)
+end
+
+-- เพิ่มรายชื่อรถ (เหมือนเดิมเป๊ะ)
+CreateCarButton("Dream", "https://raw.githubusercontent.com/stampx85-byte/Bommondom/refs/heads/main/Dream")
+CreateCarButton("รถขายม่ามา", "https://raw.githubusercontent.com/stampx85-byte/Bommondom/refs/heads/main/%E0%B8%A3%E0%B8%96%E0%B8%82%E0%B8%B2%E0%B8%A2%E0%B8%A1%E0%B8%B2%E0%B8%A1%E0%B9%88%E0%B8%B2")
+CreateCarButton("PCX", "https://raw.githubusercontent.com/stampx85-byte/Bommondom/refs/heads/main/PCX")
+CreateCarButton("Fino", "https://raw.githubusercontent.com/stampx85-byte/Bommondom/refs/heads/main/%E0%B8%9F%E0%B8%B5%E0%B9%82%E0%B8%99%E0%B9%88")
+CreateCarButton("Forza", "https://raw.githubusercontent.com/stampx85-byte/Bommondom/refs/heads/main/%E0%B8%9F%E0%B8%AD%E0%B8%8A%E0%B9%88%E0%B8%B2")
