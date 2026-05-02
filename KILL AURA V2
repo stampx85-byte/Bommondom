@@ -3,16 +3,20 @@ task.spawn(function()
     local plr = game:GetService("Players").LocalPlayer
     local mouse = plr:GetMouse()
     local UserInputService = game:GetService("UserInputService")
-    local toolStorage = game:GetService("ReplicatedStorage"):WaitForChild("ToolStorage", 10):WaitForChild("ToolsStorage", 10)
-    local HouseRemote = game:GetService("ReplicatedStorage"):WaitForChild("House", 10)
+    local ReplicatedStorage = game:GetService("ReplicatedStorage")
     local RunService = game:GetService("RunService")
+    local CoreGui = game:GetService("CoreGui")
 
-    -- ลบ UI เก่า
-    local success, err = pcall(function()
-        if game.CoreGui:FindFirstChild("SimpleSpy_Official") then
-            game.CoreGui.SimpleSpy_Official:Destroy()
+    -- ตรวจสอบการโหลดของ ToolStorage และ House Remote
+    local toolStorage = ReplicatedStorage:WaitForChild("ToolStorage", 10):WaitForChild("ToolsStorage", 10)
+    local HouseRemote = ReplicatedStorage:WaitForChild("House", 10)
+
+    -- ลบ UI เก่า (ปรับปรุงการตรวจสอบให้ปลอดภัยขึ้นสำหรับ PC)
+    for _, child in ipairs(CoreGui:GetChildren()) do
+        if child.Name == "SimpleSpy_Official" then
+            child:Destroy()
         end
-    end)
+    end
 
     --// Variables (Original Logic - NO CHANGES)
     local autoSellEnabled = false
@@ -33,19 +37,23 @@ task.spawn(function()
     local jpValue = 50
 
     --// --- [ METATABLE SYSTEM ] --- //--
+    -- ปรับให้รองรับ Executor หลายค่ายบน PC
     local mt = getrawmetatable(game)
     local oldNamecall = mt.__namecall
-    if setreadonly then setreadonly(mt, false) else make_writeable(mt) end
+    local set_readonly = setreadonly or make_readonly
+    local set_writeable = setwriteable or make_writeable
+
+    if set_writeable then set_writeable(mt, false) end
 
     mt.__namecall = newcclosure(function(self, ...)
         local method = getnamecallmethod()
         if method == "Kick" or method == "kick" then return nil end
         return oldNamecall(self, ...)
     end)
-    if setreadonly then setreadonly(mt, true) else make_readonly(mt) end
+    
+    if set_readonly then set_readonly(mt, true) end
 
-    --// --- [ SYSTEM FUNCTIONS ] --- //--
-
+    --// --- [ SYSTEM FUNCTIONS - ORIGINAL ] --- //--
     local function applyAntiCrash(p)
         if not antiCrashEnabled then return end
         local plrgui = p:WaitForChild("PlayerGui")
@@ -125,12 +133,18 @@ task.spawn(function()
         return false
     end
 
-    --// --- [ UI SETUP ] --- //--
+    --// --- [ UI SETUP - PC FIX ] --- //--
     local ScreenGui = Instance.new("ScreenGui")
     ScreenGui.Name = "SimpleSpy_Official"
     ScreenGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
-    -- ใช้ pcall เพื่อป้องกันปัญหาเรื่อง Permission ในบาง Executor
-    pcall(function() ScreenGui.Parent = game.CoreGui end)
+    
+    -- แก้ไขจุดที่ทำให้รันไม่ติด: ตรวจสอบสิทธิ์ CoreGui
+    local success, _ = pcall(function()
+        ScreenGui.Parent = CoreGui
+    end)
+    if not success then
+        ScreenGui.Parent = plr:WaitForChild("PlayerGui")
+    end
 
     local TargetLabel = Instance.new("TextLabel")
     TargetLabel.Size = UDim2.new(0, 200, 0, 30)
@@ -151,7 +165,7 @@ task.spawn(function()
     MainFrame.BackgroundColor3 = Color3.fromRGB(20, 0, 0)
     MainFrame.BorderSizePixel = 0
     MainFrame.Active = true
-    MainFrame.Draggable = true -- เปิดให้ลากได้ง่ายขึ้นบน PC
+    MainFrame.Draggable = true 
     MainFrame.Parent = ScreenGui
     Instance.new("UICorner", MainFrame)
 
@@ -165,7 +179,7 @@ task.spawn(function()
     MiniButton.TextSize = 20
     MiniButton.Visible = false
     MiniButton.Active = true
-    MiniButton.Draggable = true -- เปิดให้ลากได้
+    MiniButton.Draggable = true
     MiniButton.Parent = ScreenGui
     Instance.new("UICorner", MiniButton)
 
@@ -312,7 +326,7 @@ task.spawn(function()
             while killAuraEnabled do
                 for _, enemy in ipairs(game.Players:GetPlayers()) do
                     if enemy ~= plr and enemy.Character and enemy.Character:FindFirstChild("HumanoidRootPart") then
-                        if enemy.Character.Humanoid.Health > 0 then
+                        if enemy.Character:FindFirstChild("Humanoid") and enemy.Character.Humanoid.Health > 0 then
                             local dist = (plr.Character.HumanoidRootPart.Position - enemy.Character.HumanoidRootPart.Position).Magnitude
                             if dist <= 140 then fireGunAt(enemy.Character.HumanoidRootPart) end
                         end
@@ -401,7 +415,7 @@ task.spawn(function()
             if lastValidPos and (hrp.Position - lastValidPos.Position).Magnitude > 25 then
                 hrp.CFrame = lastValidPos
                 hrp.Velocity = Vector3.zero
-                local gi = game:GetService("ReplicatedStorage"):FindFirstChild("GetItemBack")
+                local gi = ReplicatedStorage:FindFirstChild("GetItemBack")
                 if gi then gi:FireServer() end
             else lastValidPos = hrp.CFrame end
         end
