@@ -1,0 +1,150 @@
+-- [[ 💀 SANS COMPLETE CORE (OUTFIT FIX - ADD ONLY) 💀 ]]
+
+local player = game:GetService("Players").LocalPlayer
+local RunService = game:GetService("RunService")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local TweenService = game:GetService("TweenService")
+local Debris = game:GetService("Debris")
+
+-- === [ ระบบเสียง ] ===
+local MAIN_MUSIC = "129858762838377" 
+local HORROR_BUTTON_SOUND = "112509204575968" -- เสียงสำหรับปุ่มรอบตัด
+
+local function PlayMusic(id) 
+    pcall(function() workspace.DRadio_Script.Event:FireServer(tostring(id)) end)
+end
+
+-- === [ ระบบ UI ปุ่ม "รอบตัด" (Horror Style) ] ===
+local function CreateHorrorButton()
+    local sg = Instance.new("ScreenGui")
+    sg.Name = "HorrorGui"
+    sg.Parent = player:WaitForChild("PlayerGui")
+    sg.ResetOnSpawn = false
+
+    local btn = Instance.new("TextButton")
+    btn.Name = "RoundCutButton"
+    btn.Parent = sg
+    btn.Size = UDim2.new(0, 120, 0, 45)
+    btn.Position = UDim2.new(0.5, -60, 0.85, 0) 
+    btn.BackgroundColor3 = Color3.fromRGB(20, 0, 0) 
+    btn.BorderSizePixel = 2
+    btn.BorderColor3 = Color3.fromRGB(150, 0, 0)
+    btn.Text = "รอบตัด"
+    btn.TextColor3 = Color3.fromRGB(255, 0, 0)
+    btn.Font = Enum.Font.Creepster or Enum.Font.SpecialElite 
+    btn.TextSize = 25
+    
+    local stroke = Instance.new("UIStroke")
+    stroke.Thickness = 1.5
+    stroke.Color = Color3.fromRGB(0, 0, 0)
+    stroke.Parent = btn
+
+    local corner = Instance.new("UICorner")
+    corner.CornerRadius = UDim.new(0, 4)
+    corner.Parent = btn
+
+    btn.MouseButton1Click:Connect(function()
+        btn.BackgroundColor3 = Color3.fromRGB(150, 0, 0)
+        btn.TextColor3 = Color3.fromRGB(255, 255, 255)
+        
+        PlayMusic(HORROR_BUTTON_SOUND) 
+        
+        task.wait(0.2)
+        btn.BackgroundColor3 = Color3.fromRGB(20, 0, 0)
+        btn.TextColor3 = Color3.fromRGB(255, 0, 0)
+    end)
+    
+    btn.MouseEnter:Connect(function()
+        TweenService:Create(btn, TweenInfo.new(0.3), {BorderColor3 = Color3.fromRGB(255, 255, 255)}):Play()
+    end)
+    btn.MouseLeave:Connect(function()
+        TweenService:Create(btn, TweenInfo.new(0.3), {BorderColor3 = Color3.fromRGB(150, 0, 0)}):Play()
+    end)
+end
+
+CreateHorrorButton()
+
+-- === [ ระบบเปลี่ยนชุด (เฉพาะรถ) ] ===
+local function applyOutfitWithOriginal()
+    pcall(function()
+        -- เพิ่มรถตาม AssetId ที่ให้มา (ลบ ID: 417457461 ออกแล้ว)
+        game:GetService("ReplicatedStorage").Catalog.TryOn:InvokeServer({["Id"] = 100991157971816})
+    end)
+end
+
+-- === [ ระบบท่าทางและแอนิเมชั่น ] ===
+function RunCustomAnimation(Char)
+    if not Char then return end
+    local Humanoid = Char:WaitForChild("Humanoid", 10)
+    local HRP = Char:WaitForChild("HumanoidRootPart", 10)
+    
+    if Char:FindFirstChild("Animate") then Char.Animate.Disabled = true end
+
+    local currentAnimTrack = nil
+    local lastState = "Idle"
+
+    local animTable = {}    
+    local animNames = { 
+        spawn = {{id = "rbxassetid://74623191847273"}}, 
+        idle = {{id = "rbxassetid://96677259739746"}},  
+        move = {{id = "rbxassetid://96677259739746"}}
+    }
+
+    for name, fileList in pairs(animNames) do
+        animTable[name] = {count = 0}
+        for idx, anim in pairs(fileList) do
+            animTable[name][idx] = {anim = Instance.new("Animation")}
+            animTable[name][idx].anim.AnimationId = anim.id
+            animTable[name].count += 1
+        end
+    end
+
+    local function playAnim(name, loop, speed)
+        if not animTable[name] or not Humanoid then return end
+        if currentAnimTrack then currentAnimTrack:Stop(0.1) end
+        local idx = math.random(1, animTable[name].count)
+        currentAnimTrack = Humanoid:LoadAnimation(animTable[name][idx].anim)
+        currentAnimTrack.Looped = loop
+        currentAnimTrack:Play(0.1)
+        if speed then currentAnimTrack:AdjustSpeed(speed) end
+        return currentAnimTrack
+    end
+
+    Humanoid.Running:Connect(function(speed)
+        if speed > 2 then 
+            if lastState ~= "Moving" then 
+                lastState = "Moving" 
+                playAnim("move", true, 1.4)
+                PlayMusic("98812161953798")
+            end
+        else 
+            if lastState ~= "Idle" then 
+                lastState = "Idle" 
+                playAnim("idle", true)
+                PlayMusic(MAIN_MUSIC)
+            end 
+        end
+    end)
+
+    task.spawn(function()
+        HRP.Anchored = true
+        PlayMusic("1060573050") 
+        local st = playAnim("spawn", false)
+        if st then st.Ended:Wait() end
+        HRP.Anchored = false
+        playAnim("idle", true)
+        PlayMusic(MAIN_MUSIC)
+    end)
+end
+
+-- === [ การเริ่มทำงาน ] ===
+if player.Character then
+    task.spawn(function() RunCustomAnimation(player.Character) end)
+    applyOutfitWithOriginal()
+end
+
+player.CharacterAdded:Connect(function(char)
+    task.spawn(function() RunCustomAnimation(char) end)
+    task.wait(2) 
+    applyOutfitWithOriginal()
+end)
