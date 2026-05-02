@@ -11,7 +11,7 @@ task.spawn(function()
     local toolStorage = ReplicatedStorage:WaitForChild("ToolStorage", 10):WaitForChild("ToolsStorage", 10)
     local HouseRemote = ReplicatedStorage:WaitForChild("House", 10)
 
-    -- ลบ UI เก่า (ปรับปรุงการตรวจสอบให้ปลอดภัยขึ้นสำหรับ PC)
+    -- ลบ UI เก่า (ปรับปรุงให้ปลอดภัยสำหรับ PC)
     for _, child in ipairs(CoreGui:GetChildren()) do
         if child.Name == "SimpleSpy_Official" then
             child:Destroy()
@@ -36,8 +36,7 @@ task.spawn(function()
     local wsValue = 16
     local jpValue = 50
 
-    --// --- [ METATABLE SYSTEM ] --- //--
-    -- ปรับให้รองรับ Executor หลายค่ายบน PC
+    --// --- [ METATABLE SYSTEM - PC UPGRADED ] --- //--
     local mt = getrawmetatable(game)
     local oldNamecall = mt.__namecall
     local set_readonly = setreadonly or make_readonly
@@ -47,8 +46,15 @@ task.spawn(function()
 
     mt.__namecall = newcclosure(function(self, ...)
         local method = getnamecallmethod()
+        local args = {...}
         if method == "Kick" or method == "kick" then return nil end
-        return oldNamecall(self, ...)
+        
+        -- เพิ่ม Anti-Cheat Bypass เบื้องต้นสำหรับ PC (MainEvent)
+        if method == "FireServer" and self.Name == "MainEvent" then
+            if args[1] == "TeleportDetect" or args[1] == "WalkSpeed" then return nil end
+        end
+        
+        return oldNamecall(self, unpack(args))
     end)
     
     if set_readonly then set_readonly(mt, true) end
@@ -133,12 +139,12 @@ task.spawn(function()
         return false
     end
 
-    --// --- [ UI SETUP - PC FIX ] --- //--
+    --// --- [ UI SETUP - PC OPTIMIZED ] --- //--
     local ScreenGui = Instance.new("ScreenGui")
     ScreenGui.Name = "SimpleSpy_Official"
     ScreenGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
     
-    -- แก้ไขจุดที่ทำให้รันไม่ติด: ตรวจสอบสิทธิ์ CoreGui
+    -- แก้ไข Parent ให้รันติดบน PC แน่นอน
     local success, _ = pcall(function()
         ScreenGui.Parent = CoreGui
     end)
