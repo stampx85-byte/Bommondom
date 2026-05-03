@@ -1,0 +1,183 @@
+-- [[ GOD MODE V6: GLOVE-ONLY WARP (NO CHARACTER MOVEMENT) ]] --
+-- [[ Created by ffsww_1007 ]] --
+
+local Player = game.Players.LocalPlayer
+local RunService = game:GetService("RunService")
+local UserInputService = game:GetService("UserInputService")
+local CoreGui = game:GetService("CoreGui")
+
+if CoreGui:FindFirstChild("UltraKillstreakUI") then
+    CoreGui.UltraKillstreakUI:Destroy()
+end
+
+local _G = {
+    AutoClick = false,
+    KillAura = false,
+    AutoFarm = false, 
+    AntiVoid = true,
+    FarmRange = 99999,
+    HitboxSize = 20,
+    AntiLag = true -- ระบบกั้นแลค
+}
+
+-- [[ UI Setup ]] --
+local ScreenGui = Instance.new("ScreenGui")
+ScreenGui.Name = "UltraKillstreakUI"
+ScreenGui.Parent = CoreGui
+
+local MainFrame = Instance.new("Frame")
+MainFrame.Size = UDim2.new(0, 230, 0, 320)
+MainFrame.Position = UDim2.new(0.5, -115, 0.5, -160)
+MainFrame.BackgroundColor3 = Color3.fromRGB(15, 0, 0)
+MainFrame.Active = true
+MainFrame.Draggable = true 
+MainFrame.Parent = ScreenGui
+
+Instance.new("UICorner", MainFrame).CornerRadius = UDim.new(0, 8)
+
+local Title = Instance.new("TextLabel")
+Title.Size = UDim2.new(1, 0, 0, 45)
+Title.Text = "DEATH OVERRIDE V6"
+Title.TextColor3 = Color3.fromRGB(255, 0, 0)
+Title.Font = Enum.Font.SpecialElite
+Title.TextSize = 18
+Title.BackgroundTransparency = 1
+Title.Parent = MainFrame
+
+-- [[ ระบบออโต้คลิก UI SERVER SPEED ]] --
+task.spawn(function()
+    while true do
+        RunService.Heartbeat:Wait()
+        if _G.AutoClick then
+            pcall(function()
+                local btn = Player.PlayerGui.GlovesButton.KillstreakBtn
+                if btn then
+                    firesignal(btn.MouseButton1Click)
+                    firesignal(btn.Activated)
+                    for _, v in pairs(btn:GetDescendants()) do
+                        if v:IsA("RemoteEvent") then v:FireServer() end
+                    end
+                end
+            end)
+        end
+    end
+end)
+
+-- [[ ฟังก์ชันขยาย Hitbox ]] --
+local function ExpandHitbox(targetChar)
+    pcall(function()
+        local hrp = targetChar:FindFirstChild("HumanoidRootPart")
+        if hrp and not hrp:FindFirstChild("HaxHitbox") then
+            local p = Instance.new("Part")
+            p.Name = "HaxHitbox"
+            p.Size = Vector3.new(_G.HitboxSize, _G.HitboxSize, _G.HitboxSize)
+            p.Transparency = 0.7
+            p.Color = Color3.fromRGB(255, 0, 0)
+            p.CanCollide = false
+            p.Parent = hrp
+            local w = Instance.new("WeldConstraint", p)
+            w.Part0 = hrp
+            w.Part1 = p
+            
+            -- Anti-Lag: ลบ Hitbox เมื่อเป้าหมายตาย
+            task.spawn(function()
+                local hum = targetChar:FindFirstChild("Humanoid")
+                if hum then
+                    hum.Died:Wait()
+                    if p then p:Destroy() end
+                end
+            end)
+        end
+    end)
+end
+
+-- [[ ระบบ AUTO FARM: วาร์ปเฉพาะถุงมือ (เน้นคนใกล้ + กั้นแลค) ]] --
+RunService.Stepped:Connect(function()
+    if _G.KillAura or _G.AutoFarm then
+        pcall(function()
+            local char = Player.Character
+            local tool = char:FindFirstChildOfClass("Tool")
+            
+            if tool and tool:FindFirstChild("Handle") then
+                tool.Handle.Massless = true
+                tool.Handle.CanCollide = false
+                
+                local rightGrip = char:FindFirstChild("RightGrip", true)
+                if rightGrip then rightGrip.Enabled = false end
+
+                local Target = nil
+                local CurrentMaxDist = _G.FarmRange
+
+                -- ค้นหาคนที่ใกล้ที่สุดก่อน
+                for _, v in pairs(game.Players:GetPlayers()) do
+                    if v ~= Player and v.Character and v.Character:FindFirstChild("HumanoidRootPart") and v.Character.Humanoid.Health > 0 then
+                        local dist = (char.HumanoidRootPart.Position - v.Character.HumanoidRootPart.Position).Magnitude
+                        if dist < CurrentMaxDist then
+                            CurrentMaxDist = dist
+                            Target = v.Character
+                        end
+                    end
+                end
+
+                -- ถ้าเจอเป้าหมายที่ใกล้ที่สุด
+                if Target then
+                    local targetHRP = Target.HumanoidRootPart
+                    ExpandHitbox(Target)
+                    tool:Activate()
+                    tool.Handle.CFrame = targetHRP.CFrame * CFrame.new(0, 0, -1) * CFrame.Angles(math.rad(90), 0, 0)
+                    
+                    -- Anti-Lag: หน่วงเวลาเล็กน้อยเพื่อลดการประมวลผลซ้ำซ้อน
+                    if _G.AntiLag then task.wait(0.01) end
+                end
+            end
+        end)
+    end
+end)
+
+-- [[ ระบบ ANTI-VOID ]] --
+task.spawn(function()
+    while task.wait(0.5) do
+        if _G.AntiVoid and Player.Character and Player.Character:FindFirstChild("HumanoidRootPart") then
+            if Player.Character.HumanoidRootPart.Position.Y < -15 then
+                local spawnPos = workspace:FindFirstChildOfClass("SpawnLocation")
+                if spawnPos then
+                    Player.Character.HumanoidRootPart.CFrame = spawnPos.CFrame + Vector3.new(0, 10, 0)
+                end
+            end
+        end
+    end
+end)
+
+-- [[ ปุ่มเมนู ]] --
+local function CreateBtn(text, pos, callback)
+    local btn = Instance.new("TextButton")
+    btn.Size = UDim2.new(0.85, 0, 0, 40)
+    btn.Position = pos
+    btn.BackgroundColor3 = Color3.fromRGB(40, 0, 0)
+    btn.Text = text .. ": OFF"
+    btn.TextColor3 = Color3.fromRGB(255, 255, 255)
+    btn.Font = Enum.Font.SpecialElite
+    btn.TextSize = 12
+    btn.Parent = MainFrame
+    Instance.new("UICorner", btn).CornerRadius = UDim.new(0, 6)
+
+    local active = false
+    btn.MouseButton1Click:Connect(function()
+        active = not active
+        btn.Text = text .. (active and ": ON" or ": OFF")
+        btn.BackgroundColor3 = active and Color3.fromRGB(255, 0, 0) or Color3.fromRGB(40, 0, 0)
+        callback(active)
+    end)
+end
+
+CreateBtn("GOD CLICK UI", UDim2.new(0.075, 0, 0.18, 0), function(val) _G.AutoClick = val end)
+CreateBtn("GLOVE KILL AURA", UDim2.new(0.075, 0, 0.33, 0), function(val) _G.KillAura = val end)
+CreateBtn("WARP GLOVE FARM", UDim2.new(0.075, 0, 0.48, 0), function(val) _G.AutoFarm = val end)
+CreateBtn("ANTI-VOID", UDim2.new(0.075, 0, 0.63, 0), function(val) _G.AntiVoid = val end)
+CreateBtn("NO ANIMATION", UDim2.new(0.075, 0, 0.78, 0), function(val) 
+    if Player.Character:FindFirstChild("Animate") then Player.Character.Animate.Disabled = val end 
+end)
+
+UserInputService.InputBegan:Connect(function(input, gpe)
+    if not gpe and input.KeyCode == Enum.KeyCode.Insert then MainFrame.Visible = not MainFrame.Visible end
+end)
