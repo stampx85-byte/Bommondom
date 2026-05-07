@@ -1,0 +1,221 @@
+-- [[ DEATH OVERRIDE V6: STABLE FIX & CLEAN UI ]] --
+-- [[ Created by ffsww_1007 ]] --
+
+local Player = game.Players.LocalPlayer
+local RunService = game:GetService("RunService")
+local UserInputService = game:GetService("UserInputService")
+local CoreGui = game:GetService("CoreGui")
+
+-- Anti-AFK System
+local VirtualUser = game:GetService("VirtualUser")
+Player.Idled:Connect(function()
+    VirtualUser:CaptureController()
+    VirtualUser:ClickButton2(Vector2.new())
+end)
+
+if CoreGui:FindFirstChild("UltraKillstreakUI") then
+    CoreGui.UltraKillstreakUI:Destroy()
+end
+
+local _G = {
+    AutoFarmNPC = false,
+    SelectedFolders = {}, -- เปลี่ยนเป็น table เพื่อเก็บหลายเป้าหมาย
+    SpeedHack = false,
+    SkyHeight = 50,
+    OpenPos = nil,
+    LastReset = tick()
+}
+
+-- [[ UI Setup ]] --
+local ScreenGui = Instance.new("ScreenGui", CoreGui)
+ScreenGui.Name = "UltraKillstreakUI"
+
+local MainFrame = Instance.new("Frame", ScreenGui)
+MainFrame.Size = UDim2.new(0, 230, 0, 350)
+MainFrame.Position = UDim2.new(0.5, -115, 0.5, -175)
+MainFrame.BackgroundColor3 = Color3.fromRGB(15, 0, 0)
+MainFrame.Active = true
+MainFrame.Draggable = true 
+Instance.new("UICorner", MainFrame).CornerRadius = UDim.new(0, 8)
+
+local Title = Instance.new("TextLabel", MainFrame)
+Title.Size = UDim2.new(1, 0, 0, 40)
+Title.Text = "DEATH OVERRIDE V6"
+Title.TextColor3 = Color3.fromRGB(255, 0, 0)
+Title.Font = Enum.Font.SpecialElite
+Title.TextSize = 18
+Title.BackgroundTransparency = 1
+
+local ScrollList = Instance.new("ScrollingFrame", MainFrame)
+ScrollList.Size = UDim2.new(0.9, 0, 0, 120)
+ScrollList.Position = UDim2.new(0.05, 0, 0, 50)
+ScrollList.BackgroundColor3 = Color3.fromRGB(25, 0, 0)
+ScrollList.BorderSizePixel = 0
+local UIListLayout = Instance.new("UIListLayout", ScrollList)
+
+local SelectedLabel = Instance.new("TextLabel", MainFrame)
+SelectedLabel.Size = UDim2.new(1, 0, 0, 20)
+SelectedLabel.Position = UDim2.new(0, 0, 0, 175)
+SelectedLabel.Text = "SELECTED: NONE"
+SelectedLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
+SelectedLabel.TextSize = 8
+SelectedLabel.BackgroundTransparency = 1
+SelectedLabel.TextWrapped = true
+
+local function UpdateSelectedText()
+    local count = 0
+    local names = ""
+    for name, val in pairs(_G.SelectedFolders) do
+        if val then
+            count = count + 1
+            names = names .. name .. ", "
+        end
+    end
+    if count == 0 then
+        SelectedLabel.Text = "SELECTED: NONE"
+        _G.OpenPos = nil -- รีเซ็ตตำแหน่งวาร์ปถ้าไม่มีเป้าหมาย
+    else
+        SelectedLabel.Text = "SELECTED: " .. names:sub(1, #names - 2)
+    end
+end
+
+local function UpdateNPCList()
+    for _, v in pairs(ScrollList:GetChildren()) do if v:IsA("TextButton") then v:Destroy() end end
+    local npcFolder = workspace:FindFirstChild("NPCS")
+    if npcFolder then
+        for _, folder in pairs(npcFolder:GetChildren()) do
+            local btn = Instance.new("TextButton", ScrollList)
+            btn.Size = UDim2.new(1, -10, 0, 30)
+            btn.Text = folder.Name
+            btn.BackgroundColor3 = Color3.fromRGB(45, 0, 0)
+            btn.TextColor3 = Color3.fromRGB(255, 255, 255)
+            
+            btn.MouseButton1Click:Connect(function() 
+                -- ระบบ Multi-Select Toggle
+                if _G.SelectedFolders[folder.Name] then
+                    _G.SelectedFolders[folder.Name] = nil
+                    btn.BackgroundColor3 = Color3.fromRGB(45, 0, 0)
+                else
+                    _G.SelectedFolders[folder.Name] = true
+                    btn.BackgroundColor3 = Color3.fromRGB(150, 0, 0) -- แสดงสีว่าเลือกอยู่
+                    _G.OpenPos = nil -- วาร์ปกลับจุดเดิมเมื่อเลือกเป้าหมายใหม่
+                end
+                UpdateSelectedText()
+            end)
+        end
+    end
+end
+UpdateNPCList()
+
+local FlyPart = Instance.new("Part")
+FlyPart.Size = Vector3.new(20, 1, 20)
+FlyPart.Transparency = 1
+FlyPart.Anchored = true
+FlyPart.CanCollide = true
+
+-- [[ ระบบ FARM: แก้ไขอาการตีไม่เข้า + ลากมอนให้คนอื่นเห็น + หลายโฟลเดอร์ ]] --
+task.spawn(function()
+    while task.wait(0.01) do
+        local hasTarget = false
+        for _ in pairs(_G.SelectedFolders) do hasTarget = true break end
+
+        if _G.AutoFarmNPC and hasTarget then
+            pcall(function()
+                local char = Player.Character
+                local hrp = char:FindFirstChild("HumanoidRootPart")
+                local tool = char:FindFirstChildOfClass("Tool")
+
+                if hrp and tool then
+                    if not _G.OpenPos then _G.OpenPos = hrp.CFrame end
+
+                    hrp.CFrame = _G.OpenPos * CFrame.new(0, _G.SkyHeight, 0)
+                    hrp.Velocity = Vector3.new(0, 0, 0)
+                    FlyPart.Parent = workspace
+                    FlyPart.CFrame = hrp.CFrame * CFrame.new(0, -3.5, 0)
+
+                    local collectPoint = _G.OpenPos
+
+                    if tick() - _G.LastReset > 5 then
+                        local rightGrip = char:FindFirstChild("RightGrip", true)
+                        if rightGrip then rightGrip.Enabled = true end
+                        tool.Handle.CFrame = hrp.CFrame
+                        _G.LastReset = tick()
+                        task.wait(0.1)
+                    end
+
+                    for folderName, isSelected in pairs(_G.SelectedFolders) do
+                        if isSelected then
+                            local targetFolder = workspace.NPCS:FindFirstChild(folderName)
+                            if targetFolder then
+                                for _, npc in pairs(targetFolder:GetChildren()) do
+                                    local nHrp = npc:FindFirstChild("HumanoidRootPart") or npc:FindFirstChild("Head")
+                                    local nHum = npc:FindFirstChildOfClass("Humanoid")
+                                    
+                                    if nHrp and nHum and nHum.Health > 0 then
+                                        if nHrp:IsA("BasePart") then
+                                            nHrp.CanCollide = false
+                                            nHrp.Velocity = Vector3.new(0, 0, 0)
+                                            nHrp.RotVelocity = Vector3.new(0, 0, 0)
+                                            nHrp.CFrame = collectPoint
+                                        end
+                                        
+                                        local rightGrip = char:FindFirstChild("RightGrip", true)
+                                        if rightGrip then rightGrip.Enabled = false end
+                                        tool.Handle.Massless = true
+
+                                        tool:Activate()
+                                        tool.Handle.CFrame = nHrp.CFrame
+                                    end
+                                end
+                            end
+                        end
+                    end
+                end
+            end)
+        else
+            _G.OpenPos = nil 
+            FlyPart.Parent = nil
+        end
+    end
+end)
+
+-- [[ ปุ่มฟังก์ชัน ]] --
+local function CreateBtn(text, pos, callback)
+    local btn = Instance.new("TextButton", MainFrame)
+    btn.Size = UDim2.new(0.85, 0, 0, 40)
+    btn.Position = pos
+    btn.BackgroundColor3 = Color3.fromRGB(40, 0, 0)
+    btn.Text = text .. ": OFF"
+    btn.TextColor3 = Color3.fromRGB(255, 255, 255)
+    btn.Font = Enum.Font.SpecialElite
+    btn.TextSize = 12
+    Instance.new("UICorner", btn).CornerRadius = UDim.new(0, 6)
+
+    local active = false
+    btn.MouseButton1Click:Connect(function()
+        active = not active
+        btn.Text = text .. (active and ": ON" or ": OFF")
+        btn.BackgroundColor3 = active and Color3.fromRGB(255, 0, 0) or Color3.fromRGB(40, 0, 0)
+        callback(active)
+    end)
+end
+
+CreateBtn("START TARGET FARM", UDim2.new(0.075, 0, 0.58, 0), function(val) _G.AutoFarmNPC = val end)
+CreateBtn("SPEED HACK", UDim2.new(0.075, 0, 0.72, 0), function(val) _G.SpeedHack = val end)
+CreateBtn("NO ANIMATION", UDim2.new(0.075, 0, 0.86, 0), function(val) 
+    if Player.Character:FindFirstChild("Animate") then Player.Character.Animate.Disabled = val end 
+end)
+
+task.spawn(function()
+    while task.wait() do
+        if _G.SpeedHack and Player.Character:FindFirstChild("Humanoid") then
+            Player.Character.Humanoid.WalkSpeed = 100
+        elseif not _G.SpeedHack and Player.Character:FindFirstChild("Humanoid") then
+            Player.Character.Humanoid.WalkSpeed = 16
+        end
+    end
+end)
+
+UserInputService.InputBegan:Connect(function(input, gpe)
+    if not gpe and input.KeyCode == Enum.KeyCode.Insert then MainFrame.Visible = not MainFrame.Visible end
+end)
