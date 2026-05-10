@@ -14,9 +14,9 @@ end
 local PAD_LENGTH = 1000
 local SECRET_MASK = 54321 
 local D = {
-    [2]  = "\82\101\112\108\105\99\97\116\101\100\83\116\111\114\97\103\101",
-    [14] = "\80\108\97\121\101\114\84\111\111\108\69\118\101\110\116",
-    [15] = "\84\111\111\108\77\117\115\105\99\84\101\120\116"
+    [2]  = "\82\101\112\108\105\99\97\116\101\100\83\116\111\114\97\103\101", -- ReplicatedStorage
+    [14] = "\80\108\97\121\101\114\84\111\111\108\69\118\101\110\116",       -- PlayerToolEvent
+    [15] = "\84\111\111\108\77\117\115\105\99\84\101\120\116"                -- ToolMusicText
 }
 
 local function decStrToHex(s)
@@ -44,6 +44,7 @@ local function encodeID(numStr)
     if not cleaned then return "" end
     local maskedVal = tostring(tonumber(cleaned) + SECRET_MASK)
     local hex = decStrToHex(maskedVal)
+    -- เติม 0 ให้ครบ PAD_LENGTH และพ่วง RLO + Junk เพื่อหลอก Dex/Spy
     return "0x" .. string.rep("0", PAD_LENGTH - #hex) .. hex .. string.char(226,128,174) .. "JUNK" .. math.random(100,999)
 end
 
@@ -58,12 +59,12 @@ local StopBtn = Instance.new("TextButton")
 ScreenGui.Name = "MusicBypassUI"
 ScreenGui.Parent = game.CoreGui
 
--- Main Frame (Black & Dark Red)
+-- Main Frame (Dark Neon Red Style)
 MainFrame.Name = "MainFrame"
 MainFrame.Parent = ScreenGui
 MainFrame.Size = UDim2.new(0, 240, 0, 190)
 MainFrame.Position = UDim2.new(0.5, -120, 0.5, -95)
-MainFrame.BackgroundColor3 = Color3.fromRGB(15, 0, 0) -- ดำเกือบสนิท
+MainFrame.BackgroundColor3 = Color3.fromRGB(15, 0, 0)
 MainFrame.BorderSizePixel = 0
 MainFrame.Active = true
 
@@ -73,7 +74,7 @@ UICorner.Parent = MainFrame
 
 local UIGradient = Instance.new("UIGradient")
 UIGradient.Color = ColorSequence.new{
-    ColorSequenceKeypoint.new(0, Color3.fromRGB(40, 0, 0)), 
+    ColorSequenceKeypoint.new(0, Color3.fromRGB(50, 0, 0)), 
     ColorSequenceKeypoint.new(1, Color3.fromRGB(15, 0, 0))
 }
 UIGradient.Rotation = 45
@@ -100,11 +101,11 @@ UserInputService.InputEnded:Connect(function(input)
     end
 end)
 
--- Title
+-- Title (SpecialElite Font)
 Title.Parent = MainFrame
 Title.Size = UDim2.new(1, 0, 0, 40)
 Title.Text = "SIMPLE MUSIC"
-Title.TextColor3 = Color3.fromRGB(255, 0, 0) -- สีแดงสว่าง
+Title.TextColor3 = Color3.fromRGB(255, 0, 0)
 Title.Font = Enum.Font.SpecialElite
 Title.TextSize = 20
 Title.BackgroundTransparency = 1
@@ -118,11 +119,11 @@ IDInput.Text = ""
 IDInput.PlaceholderText = "Enter Music ID..."
 IDInput.PlaceholderColor3 = Color3.fromRGB(120, 0, 0)
 IDInput.TextColor3 = Color3.fromRGB(255, 255, 255)
-IDInput.Font = Enum.Font.SourceSans
-IDInput.TextSize = 16
+IDInput.Font = Enum.Font.SpecialElite
+IDInput.TextSize = 14
 Instance.new("UICorner", IDInput)
 
--- Play Button (Red)
+-- Play Button
 PlayBtn.Parent = MainFrame
 PlayBtn.Size = UDim2.new(0.85, 0, 0, 35)
 PlayBtn.Position = UDim2.new(0.075, 0, 0.55, 0)
@@ -133,7 +134,7 @@ PlayBtn.Font = Enum.Font.SpecialElite
 PlayBtn.TextSize = 16
 Instance.new("UICorner", PlayBtn)
 
--- Stop Button (Grey/Black)
+-- Stop Button
 StopBtn.Parent = MainFrame
 StopBtn.Size = UDim2.new(0.85, 0, 0, 35)
 StopBtn.Position = UDim2.new(0.075, 0, 0.78, 0)
@@ -149,12 +150,23 @@ PlayBtn.MouseButton1Click:Connect(function()
     local id = IDInput.Text
     if id ~= "" then
         local encoded = encodeID(id)
+        
+        -- ดึง Service และ Remote โดยใช้ Bytecode เพื่อกั้นการ Search
         local rs = game:GetService(D[2])
-        local re = rs:FindFirstChild("RE")
+        local re = rs:WaitForChild("RE", 5)
+        
         if re then
-            local event = re:FindFirstChild(D[14])
+            local event = re:WaitForChild(D[14], 5)
             if event then
-                event:FireServer(D[15], encoded, true)
+                -- [[ เพิ่มระบบ args และ unpack ตามที่คุณต้องการ ]] --
+                local args = {
+                    D[15],   -- "ToolMusicText"
+                    encoded, -- ID ที่เข้ารหัสแล้ว (0x000...)
+                    [4] = true
+                }
+                
+                event:FireServer(unpack(args))
+                
                 PlayBtn.Text = "EXECUTED!"
                 task.wait(1)
                 PlayBtn.Text = "PLAY AUDIO"
@@ -164,7 +176,7 @@ PlayBtn.MouseButton1Click:Connect(function()
 end)
 
 StopBtn.MouseButton1Click:Connect(function()
-    -- ใส่ Logic หยุดเพลงของคุณที่นี่ (ถ้ามี)
+    -- ใส่ Logic หยุดเพลงตรงนี้
     StopBtn.Text = "STOPPED"
     task.wait(1)
     StopBtn.Text = "STOP MUSIC"
